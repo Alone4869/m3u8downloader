@@ -133,73 +133,133 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final _browserKey = GlobalKey<_BrowserViewState>();
+  final _downloadsKey = GlobalKey<_DownloadsViewState>();
   int _selectedIndex = 0;
   int _taskCount = 0;
+  DateTime? _exitArmedAt;
+  bool _handlingBack = false;
+
+  void _selectDestination(int index) {
+    _exitArmedAt = null;
+    setState(() => _selectedIndex = index);
+  }
+
+  Future<void> _handleSystemBack() async {
+    if (_handlingBack) return;
+    _handlingBack = true;
+    try {
+      if (_selectedIndex == 0) {
+        if (await (_browserKey.currentState?.handleSystemBack() ??
+            Future.value(false))) {
+          _exitArmedAt = null;
+          return;
+        }
+      } else if (_selectedIndex == 1) {
+        if (_downloadsKey.currentState?.handleSystemBack() == true) {
+          _exitArmedAt = null;
+          return;
+        }
+        _selectDestination(0);
+        return;
+      } else {
+        _selectDestination(0);
+        return;
+      }
+
+      final now = DateTime.now();
+      final armedAt = _exitArmedAt;
+      if (armedAt != null &&
+          now.difference(armedAt) <= const Duration(seconds: 2)) {
+        await SystemNavigator.pop();
+        return;
+      }
+      _exitArmedAt = now;
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('再返回一次退出应用'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    } finally {
+      _handlingBack = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
-        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
-        systemStatusBarContrastEnforced: false,
-      ),
-      child: Scaffold(
-        body: FullScreenPageStack(
-          index: _selectedIndex,
-          children: [
-            const BrowserView(),
-            DownloadsView(
-              onCountChanged: (count) {
-                if (mounted && count != _taskCount) {
-                  setState(() => _taskCount = count);
-                }
-              },
-            ),
-            const SettingsView(),
-          ],
+    return PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_handleSystemBack());
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+          systemStatusBarContrastEnforced: false,
         ),
-        bottomNavigationBar: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outlineVariant.withAlpha(90),
+        child: Scaffold(
+          body: FullScreenPageStack(
+            index: _selectedIndex,
+            children: [
+              BrowserView(key: _browserKey),
+              DownloadsView(
+                key: _downloadsKey,
+                onCountChanged: (count) {
+                  if (mounted && count != _taskCount) {
+                    setState(() => _taskCount = count);
+                  }
+                },
+              ),
+              const SettingsView(),
+            ],
+          ),
+          bottomNavigationBar: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withAlpha(90),
+                ),
               ),
             ),
-          ),
-          child: NavigationBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) =>
-                setState(() => _selectedIndex = index),
-            destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.public_outlined),
-                selectedIcon: Icon(Icons.public),
-                label: '浏览器',
-              ),
-              NavigationDestination(
-                icon: Badge(
-                  isLabelVisible: _taskCount > 0,
-                  label: Text('$_taskCount'),
-                  child: const Icon(Icons.download_outlined),
+            child: NavigationBar(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: _selectDestination,
+              destinations: [
+                const NavigationDestination(
+                  icon: Icon(Icons.public_outlined),
+                  selectedIcon: Icon(Icons.public),
+                  label: '浏览器',
                 ),
-                selectedIcon: Badge(
-                  isLabelVisible: _taskCount > 0,
-                  label: Text('$_taskCount'),
-                  child: const Icon(Icons.download),
+                NavigationDestination(
+                  icon: Badge(
+                    isLabelVisible: _taskCount > 0,
+                    label: Text('$_taskCount'),
+                    child: const Icon(Icons.download_outlined),
+                  ),
+                  selectedIcon: Badge(
+                    isLabelVisible: _taskCount > 0,
+                    label: Text('$_taskCount'),
+                    child: const Icon(Icons.download),
+                  ),
+                  label: '下载',
                 ),
-                label: '下载',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: '设置',
-              ),
-            ],
+                const NavigationDestination(
+                  icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings),
+                  label: '设置',
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -251,6 +311,14 @@ class _BrowserViewState extends State<BrowserView> {
   bool _canGoBack = false;
   bool _canGoForward = false;
   bool _dialogOpen = false;
+
+  Future<bool> handleSystemBack() async {
+    final controller = _webViewController;
+    if (controller == null || !await controller.canGoBack()) return false;
+    await controller.goBack();
+    await _updateNavigation();
+    return true;
+  }
 
   static const _mediaScript = r'''
     (() => {
@@ -617,6 +685,12 @@ class _DownloadsViewState extends State<DownloadsView>
   bool _editing = false;
   final Set<String> _selectedIds = {};
   bool _loading = true;
+
+  bool handleSystemBack() {
+    if (!_editing) return false;
+    _exitEditing();
+    return true;
+  }
 
   @override
   void initState() {

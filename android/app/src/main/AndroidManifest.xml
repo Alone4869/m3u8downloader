@@ -12,6 +12,7 @@
     <application
         android:label="M3U8 视频下载器"
         android:name="${applicationName}"
+        android:enableOnBackInvokedCallback="true"
         android:allowBackup="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"

@@ -78,7 +78,7 @@ class _SettingsViewState extends State<SettingsView> {
               const ListTile(
                 leading: _SettingsIcon(Icons.speed_rounded),
                 title: Text('上传引擎'),
-                subtitle: Text('SMB 2/3 · 16MB 窗口 · 4 路并行'),
+                subtitle: Text('SMB 2/3 · 自适应窗口 · 并行上传'),
               ),
             ],
           ),

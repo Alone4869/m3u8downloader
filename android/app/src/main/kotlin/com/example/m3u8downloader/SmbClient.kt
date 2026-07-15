@@ -8,6 +8,7 @@ import java.net.URLEncoder
 import java.util.Properties
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import jcifs.CIFSContext
 import jcifs.config.PropertyConfiguration
@@ -38,22 +39,28 @@ data class SmbConfig(
 }
 
 class SmbClient(private val androidContext: Context, private val config: SmbConfig) {
-    private val context: CIFSContext by lazy {
+    private val context: CIFSContext by lazy { createContext(SMB_IO_WINDOW) }
+    private val compatibilityContext: CIFSContext by lazy {
+        createContext(SMB_COMPAT_TRANSACTION_WINDOW)
+    }
+
+    private fun createContext(transactionWindow: Int): CIFSContext {
         val properties = Properties().apply {
             setProperty("jcifs.smb.client.minVersion", "SMB202")
             setProperty("jcifs.smb.client.maxVersion", "SMB311")
+            // Avoid the legacy SMB1 multi-protocol handshake. Some NAS devices
+            // answer that handshake with SMB 2.0.2 and a one-credit 64 KiB cap.
+            setProperty("jcifs.smb.client.useSMB2Negotiation", "true")
             setProperty("jcifs.smb.client.responseTimeout", "30000")
             setProperty("jcifs.smb.client.soTimeout", "60000")
             setProperty("jcifs.smb.client.useLargeReadWrite", "true")
             setProperty("jcifs.smb.client.tcpNoDelay", "true")
             setProperty("jcifs.smb.client.snd_buf_size", SMB_IO_WINDOW.toString())
             setProperty("jcifs.smb.client.rcv_buf_size", SMB_IO_WINDOW.toString())
-            // SMB2 negotiation also caps writes to transaction_buf_size. Its
-            // jcifs-ng default is only about 64 KiB, regardless of snd_buf_size.
-            setProperty("jcifs.smb.client.transaction_buf_size", SMB_IO_WINDOW.toString())
+            setProperty("jcifs.smb.client.transaction_buf_size", transactionWindow.toString())
             setProperty("jcifs.smb.client.maxMpxCount", "64")
         }
-        BaseContext(PropertyConfiguration(properties)).withCredentials(
+        return BaseContext(PropertyConfiguration(properties)).withCredentials(
             NtlmPasswordAuthenticator(config.domain, config.username, config.password),
         )
     }
@@ -123,27 +130,79 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         onProgress: (Long, Long, Double) -> Unit,
     ) {
         val fileSize = localFileSize(source)
-        val target = SmbFile(targetDirectory, fileName)
+        val remotePath = SmbFile(targetDirectory, fileName).use { it.path }
+        var activeContext = context
         try {
-            target.use { remoteFile ->
-                val reporter = UploadProgressReporter(fileSize, onProgress)
-                reporter.start()
-                if (fileSize >= PARALLEL_UPLOAD_MIN_SIZE && supportsRandomAccess(source, fileSize)) {
-                    uploadParallel(source, remoteFile.path, fileName, fileSize, reporter)
-                } else {
-                    uploadSequential(source, remoteFile, fileName, reporter)
-                }
-                reporter.finish()
+            try {
+                uploadAttempt(
+                    source,
+                    remotePath,
+                    fileName,
+                    fileSize,
+                    context,
+                    PARALLEL_UPLOAD_WORKERS,
+                    PARALLEL_UPLOAD_MIN_RANGE,
+                    PARALLEL_UPLOAD_BUFFER_SIZE,
+                    onProgress,
+                )
+            } catch (error: Exception) {
+                if (!isOversizedRequest(error)) throw error
+                deleteRemoteFile(remotePath, context)
+                activeContext = compatibilityContext
+                uploadAttempt(
+                    source,
+                    remotePath,
+                    fileName,
+                    fileSize,
+                    compatibilityContext,
+                    COMPAT_PARALLEL_UPLOAD_WORKERS,
+                    COMPAT_PARALLEL_UPLOAD_MIN_RANGE,
+                    COMPAT_PARALLEL_UPLOAD_BUFFER_SIZE,
+                    onProgress,
+                )
             }
             if (fileSize > 0L) {
-                SmbFile(targetDirectory, fileName).use { uploadedFile ->
+                SmbFile(remotePath, activeContext).use { uploadedFile ->
                     if (uploadedFile.length() != fileSize) error("远端文件大小校验失败：$fileName")
                 }
             }
         } catch (error: Exception) {
-            runCatching { SmbFile(targetDirectory, fileName).use { it.delete() } }
+            deleteRemoteFile(remotePath, activeContext)
             throw error
         }
+    }
+
+    private fun uploadAttempt(
+        source: Uri,
+        remotePath: String,
+        fileName: String,
+        fileSize: Long,
+        cifsContext: CIFSContext,
+        maxWorkers: Int,
+        minimumRange: Long,
+        bufferSize: Int,
+        onProgress: (Long, Long, Double) -> Unit,
+    ) {
+        val reporter = UploadProgressReporter(fileSize, onProgress)
+        reporter.start()
+        if (fileSize >= PARALLEL_UPLOAD_MIN_SIZE && supportsRandomAccess(source, fileSize)) {
+            uploadParallel(
+                source,
+                remotePath,
+                fileName,
+                fileSize,
+                cifsContext,
+                maxWorkers,
+                minimumRange,
+                bufferSize,
+                reporter,
+            )
+        } else {
+            SmbFile(remotePath, cifsContext).use { remoteFile ->
+                uploadSequential(source, remoteFile, fileName, reporter)
+            }
+        }
+        reporter.finish()
     }
 
     private fun uploadSequential(
@@ -174,17 +233,21 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         remotePath: String,
         fileName: String,
         fileSize: Long,
+        cifsContext: CIFSContext,
+        maxWorkers: Int,
+        minimumRange: Long,
+        bufferSize: Int,
         reporter: UploadProgressReporter,
     ) {
-        SmbFile(remotePath, context).use { remoteFile ->
+        SmbFile(remotePath, cifsContext).use { remoteFile ->
             SmbRandomAccessFile(remoteFile, "rw").use { output ->
                 output.setLength(fileSize)
             }
         }
 
         val workerCount = minOf(
-            PARALLEL_UPLOAD_WORKERS,
-            ((fileSize + PARALLEL_UPLOAD_MIN_RANGE - 1L) / PARALLEL_UPLOAD_MIN_RANGE).toInt(),
+            maxWorkers,
+            ((fileSize + minimumRange - 1L) / minimumRange).toInt(),
         ).coerceAtLeast(1)
         val executor = Executors.newFixedThreadPool(workerCount)
         val futures = mutableListOf<Future<*>>()
@@ -197,7 +260,16 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                     fileSize / workerCount * (workerIndex + 1)
                 }
                 futures += executor.submit {
-                    uploadRange(source, remotePath, fileName, start, end, reporter)
+                    uploadRange(
+                        source,
+                        remotePath,
+                        fileName,
+                        start,
+                        end,
+                        cifsContext,
+                        bufferSize,
+                        reporter,
+                    )
                 }
             }
             futures.forEach { future ->
@@ -212,6 +284,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
             }
         } finally {
             executor.shutdownNow()
+            executor.awaitTermination(5L, TimeUnit.SECONDS)
         }
     }
 
@@ -221,6 +294,8 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         fileName: String,
         start: Long,
         end: Long,
+        cifsContext: CIFSContext,
+        bufferSize: Int,
         reporter: UploadProgressReporter,
     ) {
         val descriptor = androidContext.contentResolver.openFileDescriptor(source, "r")
@@ -228,10 +303,10 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         descriptor.use {
             FileInputStream(it.fileDescriptor).use { input ->
                 input.channel.position(start)
-                SmbFile(remotePath, context).use { remoteFile ->
+                SmbFile(remotePath, cifsContext).use { remoteFile ->
                     SmbRandomAccessFile(remoteFile, "rw").use { output ->
                         output.seek(start)
-                        val buffer = ByteArray(PARALLEL_UPLOAD_BUFFER_SIZE)
+                        val buffer = ByteArray(bufferSize)
                         var remaining = end - start
                         while (remaining > 0L) {
                             if (Thread.currentThread().isInterrupted) error("上传已取消")
@@ -243,6 +318,25 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private fun isOversizedRequest(error: Exception): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current.message?.contains("exceeds allowable size", ignoreCase = true) == true) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
+    }
+
+    private fun deleteRemoteFile(remotePath: String, cifsContext: CIFSContext) {
+        runCatching {
+            SmbFile(remotePath, cifsContext).use { remoteFile ->
+                if (remoteFile.exists()) remoteFile.delete()
             }
         }
     }
@@ -310,6 +404,10 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         private const val PARALLEL_UPLOAD_WORKERS = 4
         private const val PARALLEL_UPLOAD_MIN_SIZE = 32L * 1024 * 1024
         private const val PARALLEL_UPLOAD_MIN_RANGE = 16L * 1024 * 1024
+        private const val SMB_COMPAT_TRANSACTION_WINDOW = 64 * 1024
+        private const val COMPAT_PARALLEL_UPLOAD_WORKERS = 24
+        private const val COMPAT_PARALLEL_UPLOAD_MIN_RANGE = 4L * 1024 * 1024
+        private const val COMPAT_PARALLEL_UPLOAD_BUFFER_SIZE = 512 * 1024
         private const val PROGRESS_INTERVAL_NANOS = 200L * 1_000_000
     }
 

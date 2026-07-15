@@ -1,15 +1,16 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
-class GlassBackdrop extends StatelessWidget {
-  const GlassBackdrop({super.key, required this.child});
+/// A quiet app backdrop that gives the floating navigation glass just enough
+/// colour to refract without turning every page into a decorative gradient.
+class AppBackdrop extends StatelessWidget {
+  const AppBackdrop({super.key, required this.child});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final colors = Theme.of(context).colorScheme;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -17,37 +18,20 @@ class GlassBackdrop extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: dark
-                  ? const [Color(0xFF090B11), Color(0xFF101528)]
-                  : const [Color(0xFFF8F9FF), Color(0xFFEFF2FF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+                  ? const [Color(0xFF0D0F14), Color(0xFF12151B)]
+                  : const [Color(0xFFF8F9FC), Color(0xFFF1F3F8)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
           ),
         ),
         IgnorePointer(
-          child: Stack(
-            children: [
-              Positioned(
-                top: -130,
-                right: -100,
-                child: _GlowOrb(
-                  size: 330,
-                  color: const Color(
-                    0xFF625BFF,
-                  ).withValues(alpha: dark ? 0.24 : 0.16),
-                ),
-              ),
-              Positioned(
-                bottom: 20,
-                left: -150,
-                child: _GlowOrb(
-                  size: 360,
-                  color: const Color(
-                    0xFF27B7FF,
-                  ).withValues(alpha: dark ? 0.14 : 0.11),
-                ),
-              ),
-            ],
+          child: Align(
+            alignment: const Alignment(0, 1.18),
+            child: _GlowOrb(
+              size: 360,
+              color: colors.primary.withValues(alpha: dark ? 0.13 : 0.09),
+            ),
           ),
         ),
         child,
@@ -76,77 +60,52 @@ class _GlowOrb extends StatelessWidget {
   }
 }
 
-class GlassSurface extends StatelessWidget {
-  const GlassSurface({
+/// The shared content surface. Glass is intentionally reserved for the
+/// floating navigation bar; cards and dialogs stay crisp and readable.
+class AppSurface extends StatelessWidget {
+  const AppSurface({
     super.key,
     required this.child,
-    this.borderRadius = 24,
-    this.blurSigma = 20,
+    this.borderRadius = 20,
     this.padding,
-    this.tintStrength = 1,
-    this.showShadow = true,
+    this.elevated = false,
   });
 
   final Widget child;
   final double borderRadius;
-  final double blurSigma;
   final EdgeInsetsGeometry? padding;
-  final double tintStrength;
-  final bool showShadow;
+  final bool elevated;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final colors = Theme.of(context).colorScheme;
-    final radius = BorderRadius.circular(borderRadius);
-    final topTint = (dark ? 0.15 : 0.58) * tintStrength;
-    final bottomTint = (dark ? 0.07 : 0.30) * tintStrength;
-
-    return RepaintBoundary(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: showShadow
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: dark ? 0.32 : 0.12),
-                    blurRadius: 30,
-                    offset: const Offset(0, 12),
-                  ),
-                  BoxShadow(
-                    color: colors.primary.withValues(alpha: dark ? 0.08 : 0.05),
-                    blurRadius: 22,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: radius,
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: topTint.clamp(0, 1)),
-                    (dark ? const Color(0xFF171A24) : Colors.white).withValues(
-                      alpha: bottomTint.clamp(0, 1),
-                    ),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(borderRadius),
+      side: BorderSide(
+        color: colors.outlineVariant.withValues(alpha: dark ? 0.38 : 0.62),
+        width: 0.8,
+      ),
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: elevated
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: dark ? 0.24 : 0.07),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
                 ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: dark ? 0.17 : 0.72),
-                  width: 0.8,
-                ),
-              ),
-              child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
-            ),
-          ),
-        ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: dark ? const Color(0xFF191C22) : Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
       ),
     );
   }

@@ -179,7 +179,7 @@ class _SettingsViewState extends State<SettingsView> {
               ListTile(
                 leading: _SettingsIcon(Icons.info_outline_rounded),
                 title: Text('M3U8 视频下载器'),
-                subtitle: Text('版本 1.0.0'),
+                subtitle: Text('版本 1.0.12'),
               ),
               Divider(indent: 64),
               ListTile(
@@ -201,26 +201,27 @@ class _SettingsHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
+    return AppSurface(
+      elevated: true,
+      borderRadius: 22,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [colors.primaryContainer, colors.tertiaryContainer],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: Row(
         children: [
           Container(
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: colors.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(17),
+              color: colors.primary,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.primary.withValues(alpha: 0.24),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            child: Icon(Icons.movie_filter_rounded, color: colors.primary),
+            child: const Icon(Icons.movie_filter_rounded, color: Colors.white),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -230,7 +231,7 @@ class _SettingsHero extends StatelessWidget {
                 Text(
                   'M3U8 Downloader',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: colors.onPrimaryContainer,
+                    color: colors.onSurface,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -238,7 +239,7 @@ class _SettingsHero extends StatelessWidget {
                 Text(
                   '快速捕获、下载并归档视频',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onPrimaryContainer.withAlpha(190),
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -257,15 +258,7 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassSurface(
-      borderRadius: 22,
-      blurSigma: 18,
-      tintStrength: 0.76,
-      child: Material(
-        type: MaterialType.transparency,
-        child: Column(children: children),
-      ),
-    );
+    return AppSurface(borderRadius: 20, child: Column(children: children));
   }
 }
 
@@ -301,7 +294,8 @@ class _SettingsHeader extends StatelessWidget {
       child: Text(
         title,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

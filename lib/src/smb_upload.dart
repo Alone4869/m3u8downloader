@@ -129,9 +129,9 @@ class _UploadProgressDialog extends StatelessWidget {
       elevation: 0,
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-      child: GlassSurface(
-        borderRadius: 28,
-        blurSigma: 28,
+      child: AppSurface(
+        borderRadius: 24,
+        elevated: true,
         padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
         child: SizedBox(
           width: 390,

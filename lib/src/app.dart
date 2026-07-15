@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 
 import 'browser_settings.dart';
 import 'download_bridge.dart';
@@ -29,9 +30,9 @@ class M3u8DownloaderApp extends StatelessWidget {
 ThemeData _buildAppTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
   final scheme = ColorScheme.fromSeed(
-    seedColor: const Color(0xFF4F46E5),
+    seedColor: const Color(0xFF3F6FD8),
     brightness: brightness,
-    dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+    dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
   );
   final base = ThemeData(
     useMaterial3: true,
@@ -79,9 +80,7 @@ ThemeData _buildAppTheme(Brightness brightness) {
     ),
     dialogTheme: DialogThemeData(
       elevation: 18,
-      backgroundColor: dark
-          ? const Color(0xFF181B22).withValues(alpha: 0.90)
-          : Colors.white.withValues(alpha: 0.92),
+      backgroundColor: dark ? const Color(0xFF191C22) : Colors.white,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
@@ -212,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
           statusBarBrightness: dark ? Brightness.dark : Brightness.light,
           systemStatusBarContrastEnforced: false,
         ),
-        child: GlassBackdrop(
+        child: AppBackdrop(
           child: Scaffold(
             backgroundColor: Colors.transparent,
             body: FullScreenPageStack(
@@ -232,42 +231,93 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             bottomNavigationBar: SafeArea(
               top: false,
-              minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: GlassSurface(
-                borderRadius: 30,
-                blurSigma: 24,
-                tintStrength: 0.92,
-                child: NavigationBar(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: _selectDestination,
-                  destinations: [
-                    const NavigationDestination(
-                      icon: Icon(Icons.public_outlined),
-                      selectedIcon: Icon(Icons.public),
-                      label: '浏览器',
-                    ),
-                    NavigationDestination(
-                      icon: Badge(
-                        isLabelVisible: _taskCount > 0,
-                        label: Text('$_taskCount'),
-                        child: const Icon(Icons.download_outlined),
-                      ),
-                      selectedIcon: Badge(
-                        isLabelVisible: _taskCount > 0,
-                        label: Text('$_taskCount'),
-                        child: const Icon(Icons.download),
-                      ),
-                      label: '下载',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.settings_outlined),
-                      selectedIcon: Icon(Icons.settings),
-                      label: '设置',
-                    ),
-                  ],
-                ),
+              minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              child: _LiquidNavigationBar(
+                selectedIndex: _selectedIndex,
+                taskCount: _taskCount,
+                onChanged: _selectDestination,
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiquidNavigationBar extends StatelessWidget {
+  const _LiquidNavigationBar({
+    required this.selectedIndex,
+    required this.taskCount,
+    required this.onChanged,
+  });
+
+  final int selectedIndex;
+  final int taskCount;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final downloadLabel = taskCount > 0 ? '下载 $taskCount' : '下载';
+
+    return LayoutBuilder(
+      builder: (context, constraints) => LiquidGlassBottomNavBar(
+        width: constraints.maxWidth,
+        height: 68,
+        margin: EdgeInsets.zero,
+        itemPadding: 5,
+        selectedIndex: selectedIndex,
+        onChanged: onChanged,
+        items: [
+          const LiquidGlassTabBarItem(
+            icon: Icons.public_outlined,
+            selectedIcon: Icons.public_rounded,
+            label: '浏览器',
+          ),
+          LiquidGlassTabBarItem(
+            icon: Icons.download_outlined,
+            selectedIcon: Icons.download_rounded,
+            label: downloadLabel,
+          ),
+          const LiquidGlassTabBarItem(
+            icon: Icons.settings_outlined,
+            selectedIcon: Icons.settings_rounded,
+            label: '设置',
+          ),
+        ],
+        itemStyle: LiquidGlassNavItemStyle(
+          selectedColor: colors.primary,
+          unselectedColor: colors.onSurfaceVariant,
+          iconSize: 23,
+          labelFontSize: 11,
+          iconLabelGap: 3,
+          selectedFontWeight: FontWeight.w700,
+        ),
+        pillStyle: LiquidGlassNavPillStyle(
+          mode: LiquidGlassPillMode.none,
+          animated: true,
+          animationDuration: const Duration(milliseconds: 280),
+          animationCurve: Curves.easeOutCubic,
+          color: colors.primary.withValues(alpha: dark ? 0.22 : 0.13),
+        ),
+        style: LiquidGlassStyle(
+          shape: LiquidGlassShape.continuousRoundedRectangle(
+            cornerRadius: 28,
+            borderWidth: 0.9,
+            borderColor: Colors.white.withValues(alpha: dark ? 0.17 : 0.72),
+          ),
+          appearance: LiquidGlassAppearance(
+            color: dark ? const Color(0x7A171A21) : const Color(0x8AFFFFFF),
+            saturation: 1.08,
+            blur: const LiquidGlassBlur(sigmaX: 10, sigmaY: 10),
+          ),
+          refraction: const LiquidGlassRefraction(
+            distortion: 0.035,
+            distortionWidth: 20,
+            chromaticAberration: 0.0008,
           ),
         ),
       ),
@@ -1021,29 +1071,28 @@ class DownloadsHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          GlassSurface(
-            borderRadius: 18,
-            blurSigma: 16,
-            tintStrength: 0.78,
-            showShadow: false,
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(
+                color: colors.outlineVariant.withValues(alpha: 0.55),
+                width: 0.8,
+              ),
+            ),
             child: TabBar(
               key: const ValueKey('downloads-tabs'),
               controller: controller,
               dividerColor: Colors.transparent,
               indicator: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colors.primary.withValues(alpha: 0.78),
-                    colors.tertiary.withValues(alpha: 0.62),
-                  ],
-                ),
+                color: colors.primary,
                 borderRadius: BorderRadius.circular(13),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
                 boxShadow: [
                   BoxShadow(
-                    color: colors.primary.withValues(alpha: 0.22),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
+                    color: colors.primary.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),

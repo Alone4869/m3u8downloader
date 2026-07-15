@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Task history and non-sensitive SMB settings. Secure-storage files are
+         intentionally excluded because their Android Keystore key does not
+         survive uninstall/restore. -->
+    <include domain="sharedpref" path="download_tasks.xml" />
+    <include domain="sharedpref" path="FlutterSharedPreferences.xml" />
+</full-backup-content>

@@ -10,6 +10,7 @@ import 'download_bridge.dart';
 import 'glass_surface.dart';
 import 'settings_view.dart';
 import 'smb_upload.dart';
+import 'twitter_home_view.dart';
 
 class M3u8DownloaderApp extends StatelessWidget {
   const M3u8DownloaderApp({super.key});
@@ -139,7 +140,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _browserKey = GlobalKey<_BrowserViewState>();
   final _downloadsKey = GlobalKey<_DownloadsViewState>();
   int _selectedIndex = 0;
   int _taskCount = 0;
@@ -155,20 +155,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_handlingBack) return;
     _handlingBack = true;
     try {
-      if (_selectedIndex == 0) {
-        if (await (_browserKey.currentState?.handleSystemBack() ??
-            Future.value(false))) {
-          _exitArmedAt = null;
-          return;
-        }
-      } else if (_selectedIndex == 1) {
+      if (_selectedIndex == 1) {
         if (_downloadsKey.currentState?.handleSystemBack() == true) {
           _exitArmedAt = null;
           return;
         }
         _selectDestination(0);
         return;
-      } else {
+      } else if (_selectedIndex != 0) {
         _selectDestination(0);
         return;
       }
@@ -218,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
             body: FullScreenPageStack(
               index: _selectedIndex,
               children: [
-                BrowserView(key: _browserKey),
+                const TwitterHomeView(),
                 DownloadsView(
                   key: _downloadsKey,
                   onCountChanged: (count) {
@@ -262,7 +256,6 @@ class _LiquidNavigationBar extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-    final browserSelected = selectedIndex == 0;
     final downloadLabel = taskCount > 0 ? '下载 $taskCount' : '下载';
 
     return LayoutBuilder(
@@ -275,9 +268,9 @@ class _LiquidNavigationBar extends StatelessWidget {
         onChanged: onChanged,
         items: [
           const LiquidGlassTabBarItem(
-            icon: Icons.public_outlined,
-            selectedIcon: Icons.public_rounded,
-            label: '浏览器',
+            icon: Icons.home_outlined,
+            selectedIcon: Icons.home_rounded,
+            label: '首页',
           ),
           LiquidGlassTabBarItem(
             icon: Icons.download_outlined,
@@ -312,17 +305,8 @@ class _LiquidNavigationBar extends StatelessWidget {
             borderColor: Colors.white.withValues(alpha: dark ? 0.12 : 0.30),
           ),
           appearance: LiquidGlassAppearance(
-            // Android Platform Views are unavailable to Flutter's backdrop
-            // sampler. Strengthen the glass material itself on the browser
-            // page instead of painting an extra white layer underneath it.
-            color: dark
-                ? (browserSelected
-                      ? const Color(0x76171A21)
-                      : const Color(0x30171A21))
-                : (browserSelected
-                      ? const Color(0x72FFFFFF)
-                      : const Color(0x24FFFFFF)),
-            saturation: browserSelected ? 0.92 : 1.04,
+            color: dark ? const Color(0x30171A21) : const Color(0x24FFFFFF),
+            saturation: 1.04,
             blur: const LiquidGlassBlur(sigmaX: 4, sigmaY: 4),
           ),
           refraction: const LiquidGlassRefraction(

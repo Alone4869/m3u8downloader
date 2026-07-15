@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'browser_settings.dart';
 import 'download_bridge.dart';
 import 'glass_surface.dart';
 import 'smb_settings.dart';
@@ -14,7 +13,6 @@ class SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<SettingsView> {
   SmbConfig? _smbConfig;
-  String _browserHomeUrl = defaultBrowserHomeUrl;
 
   @override
   void initState() {
@@ -23,82 +21,9 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _reload() async {
-    final configFuture = SmbSettingsStore.instance.load();
-    final homeUrlFuture = BrowserSettingsStore.instance.load();
-    final config = await configFuture;
-    final homeUrl = await homeUrlFuture;
+    final config = await SmbSettingsStore.instance.load();
     if (mounted) {
-      setState(() {
-        _smbConfig = config;
-        _browserHomeUrl = homeUrl;
-      });
-    }
-  }
-
-  Future<void> _editBrowserHomeUrl() async {
-    final formKey = GlobalKey<FormState>();
-    final controller = TextEditingController(text: _browserHomeUrl);
-    try {
-      final value = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          icon: const Icon(Icons.home_outlined),
-          title: const Text('浏览器默认网址'),
-          content: Form(
-            key: formKey,
-            child: TextFormField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.done,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: '主页网址',
-                hintText: 'https://example.com',
-                prefixIcon: Icon(Icons.language_outlined),
-              ),
-              validator: (input) {
-                try {
-                  normalizeBrowserHomeUrl(input ?? '');
-                  return null;
-                } on FormatException catch (error) {
-                  return error.message.toString();
-                }
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.pop(dialogContext, defaultBrowserHomeUrl),
-              child: const Text('恢复默认'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() != true) return;
-                Navigator.pop(
-                  dialogContext,
-                  normalizeBrowserHomeUrl(controller.text),
-                );
-              },
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      );
-      if (value == null) return;
-      await BrowserSettingsStore.instance.save(value);
-      if (!mounted) return;
-      setState(() => _browserHomeUrl = value);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('浏览器默认网址已保存')));
-    } finally {
-      controller.dispose();
+      setState(() => _smbConfig = config);
     }
   }
 
@@ -118,18 +43,6 @@ class _SettingsViewState extends State<SettingsView> {
                 leading: _SettingsIcon(Icons.folder_outlined),
                 title: Text('下载位置'),
                 subtitle: Text('下载/M3U8 Downloader'),
-              ),
-              const Divider(indent: 64),
-              ListTile(
-                leading: const _SettingsIcon(Icons.home_outlined),
-                title: const Text('浏览器默认网址'),
-                subtitle: Text(
-                  _browserHomeUrl,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: _editBrowserHomeUrl,
               ),
               const Divider(indent: 64),
               const ListTile(
@@ -179,7 +92,7 @@ class _SettingsViewState extends State<SettingsView> {
               ListTile(
                 leading: _SettingsIcon(Icons.info_outline_rounded),
                 title: Text('M3U8 视频下载器'),
-                subtitle: Text('版本 1.0.15'),
+                subtitle: Text('版本 1.1.0'),
               ),
               Divider(indent: 64),
               ListTile(

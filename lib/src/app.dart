@@ -213,6 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: AppBackdrop(
           child: Scaffold(
+            extendBody: true,
             backgroundColor: Colors.transparent,
             body: FullScreenPageStack(
               index: _selectedIndex,
@@ -301,7 +302,7 @@ class _LiquidNavigationBar extends StatelessWidget {
           animated: true,
           animationDuration: const Duration(milliseconds: 280),
           animationCurve: Curves.easeOutCubic,
-          color: colors.primary.withValues(alpha: dark ? 0.22 : 0.13),
+          color: colors.primary.withValues(alpha: dark ? 0.18 : 0.10),
         ),
         style: LiquidGlassStyle(
           shape: LiquidGlassShape.continuousRoundedRectangle(
@@ -310,9 +311,9 @@ class _LiquidNavigationBar extends StatelessWidget {
             borderColor: Colors.white.withValues(alpha: dark ? 0.17 : 0.72),
           ),
           appearance: LiquidGlassAppearance(
-            color: dark ? const Color(0x7A171A21) : const Color(0x8AFFFFFF),
-            saturation: 1.08,
-            blur: const LiquidGlassBlur(sigmaX: 10, sigmaY: 10),
+            color: dark ? const Color(0x40171A21) : const Color(0x30FFFFFF),
+            saturation: 1.04,
+            blur: const LiquidGlassBlur(sigmaX: 4, sigmaY: 4),
           ),
           refraction: const LiquidGlassRefraction(
             distortion: 0.035,
@@ -1009,6 +1010,7 @@ class DownloadsPageFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navigationInset = MediaQuery.paddingOf(context).bottom;
     return ColoredBox(
       color: Colors.transparent,
       child: SafeArea(
@@ -1019,6 +1021,7 @@ class DownloadsPageFrame extends StatelessWidget {
             header,
             Expanded(child: body),
             bottomBar,
+            if (navigationInset > 0) SizedBox(height: navigationInset),
           ],
         ),
       ),

@@ -108,7 +108,7 @@ class _SettingsViewState extends State<SettingsView> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
           const _SettingsHero(),
           const _SettingsHeader('通用设置'),
@@ -179,7 +179,7 @@ class _SettingsViewState extends State<SettingsView> {
               ListTile(
                 leading: _SettingsIcon(Icons.info_outline_rounded),
                 title: Text('M3U8 视频下载器'),
-                subtitle: Text('版本 1.0.12'),
+                subtitle: Text('版本 1.0.13'),
               ),
               Divider(indent: 64),
               ListTile(
@@ -189,6 +189,7 @@ class _SettingsViewState extends State<SettingsView> {
               ),
             ],
           ),
+          const SizedBox(height: 96),
         ],
       ),
     );

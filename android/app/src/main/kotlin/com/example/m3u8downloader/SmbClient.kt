@@ -6,12 +6,16 @@ import android.provider.MediaStore
 import java.io.FileInputStream
 import java.net.URLEncoder
 import java.util.Properties
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicLong
 import jcifs.CIFSContext
 import jcifs.config.PropertyConfiguration
 import jcifs.context.BaseContext
 import jcifs.smb.NtlmPasswordAuthenticator
 import jcifs.smb.SmbFile
 import jcifs.smb.SmbFileOutputStream
+import jcifs.smb.SmbRandomAccessFile
 
 data class SmbConfig(
     val host: String,
@@ -119,27 +123,14 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         val target = SmbFile(targetDirectory, fileName)
         try {
             target.use { remoteFile ->
-                val descriptor = androidContext.contentResolver.openFileDescriptor(source, "r")
-                    ?: error("无法读取本地文件：$fileName")
-                descriptor.use {
-                    FileInputStream(it.fileDescriptor).use { input ->
-                        SmbFileOutputStream(remoteFile, false).use { output ->
-                            val buffer = ByteArray(UPLOAD_BUFFER_SIZE)
-                            var uploadedBytes = 0L
-                            val startedAt = System.nanoTime()
-                            onProgress(0L, fileSize, 0.0)
-                            while (true) {
-                                val count = input.read(buffer)
-                                if (count < 0) break
-                                output.write(buffer, 0, count)
-                                uploadedBytes += count
-                                val elapsedSeconds =
-                                    (System.nanoTime() - startedAt).coerceAtLeast(1L) / 1_000_000_000.0
-                                onProgress(uploadedBytes, fileSize, uploadedBytes / elapsedSeconds)
-                            }
-                        }
-                    }
+                val reporter = UploadProgressReporter(fileSize, onProgress)
+                reporter.start()
+                if (fileSize >= PARALLEL_UPLOAD_MIN_SIZE && supportsRandomAccess(source, fileSize)) {
+                    uploadParallel(source, remoteFile.path, fileName, fileSize, reporter)
+                } else {
+                    uploadSequential(source, remoteFile, fileName, reporter)
                 }
+                reporter.finish()
             }
             if (fileSize > 0L) {
                 SmbFile(targetDirectory, fileName).use { uploadedFile ->
@@ -150,6 +141,122 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
             runCatching { SmbFile(targetDirectory, fileName).use { it.delete() } }
             throw error
         }
+    }
+
+    private fun uploadSequential(
+        source: Uri,
+        remoteFile: SmbFile,
+        fileName: String,
+        reporter: UploadProgressReporter,
+    ) {
+        val descriptor = androidContext.contentResolver.openFileDescriptor(source, "r")
+            ?: error("无法读取本地文件：$fileName")
+        descriptor.use {
+            FileInputStream(it.fileDescriptor).use { input ->
+                SmbFileOutputStream(remoteFile, false).use { output ->
+                    val buffer = ByteArray(SEQUENTIAL_UPLOAD_BUFFER_SIZE)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        reporter.add(count)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun uploadParallel(
+        source: Uri,
+        remotePath: String,
+        fileName: String,
+        fileSize: Long,
+        reporter: UploadProgressReporter,
+    ) {
+        SmbFile(remotePath, context).use { remoteFile ->
+            SmbRandomAccessFile(remoteFile, "rw").use { output ->
+                output.setLength(fileSize)
+            }
+        }
+
+        val workerCount = minOf(
+            PARALLEL_UPLOAD_WORKERS,
+            ((fileSize + PARALLEL_UPLOAD_MIN_RANGE - 1L) / PARALLEL_UPLOAD_MIN_RANGE).toInt(),
+        ).coerceAtLeast(1)
+        val executor = Executors.newFixedThreadPool(workerCount)
+        val futures = mutableListOf<Future<*>>()
+        try {
+            repeat(workerCount) { workerIndex ->
+                val start = fileSize / workerCount * workerIndex
+                val end = if (workerIndex == workerCount - 1) {
+                    fileSize
+                } else {
+                    fileSize / workerCount * (workerIndex + 1)
+                }
+                futures += executor.submit {
+                    uploadRange(source, remotePath, fileName, start, end, reporter)
+                }
+            }
+            futures.forEach { future ->
+                try {
+                    future.get()
+                } catch (error: Exception) {
+                    futures.forEach { it.cancel(true) }
+                    val cause = error.cause
+                    if (cause is Exception) throw cause
+                    throw error
+                }
+            }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun uploadRange(
+        source: Uri,
+        remotePath: String,
+        fileName: String,
+        start: Long,
+        end: Long,
+        reporter: UploadProgressReporter,
+    ) {
+        val descriptor = androidContext.contentResolver.openFileDescriptor(source, "r")
+            ?: error("无法读取本地文件：$fileName")
+        descriptor.use {
+            FileInputStream(it.fileDescriptor).use { input ->
+                input.channel.position(start)
+                SmbFile(remotePath, context).use { remoteFile ->
+                    SmbRandomAccessFile(remoteFile, "rw").use { output ->
+                        output.seek(start)
+                        val buffer = ByteArray(PARALLEL_UPLOAD_BUFFER_SIZE)
+                        var remaining = end - start
+                        while (remaining > 0L) {
+                            if (Thread.currentThread().isInterrupted) error("上传已取消")
+                            val count = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                            if (count < 0) error("读取本地文件时意外结束：$fileName")
+                            output.write(buffer, 0, count)
+                            remaining -= count
+                            reporter.add(count)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun supportsRandomAccess(uri: Uri, fileSize: Long): Boolean {
+        if (fileSize <= 1L) return false
+        return runCatching {
+            val descriptor = androidContext.contentResolver.openFileDescriptor(uri, "r")
+                ?: return@runCatching false
+            descriptor.use {
+                FileInputStream(it.fileDescriptor).use { input ->
+                    input.channel.position(1L)
+                    input.channel.position(0L)
+                }
+            }
+            true
+        }.getOrDefault(false)
     }
 
     private fun localFileSize(uri: Uri): Long {
@@ -194,6 +301,41 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         // jcifs-ng otherwise caps SMB2 writes at roughly 64 KiB. A 1 MiB
         // negotiated write keeps a LAN link busy without excessive Android GC.
         private const val SMB_TRANSPORT_BUFFER = 1024 * 1024
-        private const val UPLOAD_BUFFER_SIZE = 8 * 1024 * 1024
+        private const val SEQUENTIAL_UPLOAD_BUFFER_SIZE = 8 * 1024 * 1024
+        private const val PARALLEL_UPLOAD_BUFFER_SIZE = 1024 * 1024
+        private const val PARALLEL_UPLOAD_WORKERS = 4
+        private const val PARALLEL_UPLOAD_MIN_SIZE = 32L * 1024 * 1024
+        private const val PARALLEL_UPLOAD_MIN_RANGE = 16L * 1024 * 1024
+        private const val PROGRESS_INTERVAL_NANOS = 200L * 1_000_000
+    }
+
+    private class UploadProgressReporter(
+        private val totalBytes: Long,
+        private val onProgress: (Long, Long, Double) -> Unit,
+    ) {
+        private val uploadedBytes = AtomicLong(0L)
+        private val lastReportAt = AtomicLong(0L)
+        private val startedAt = System.nanoTime()
+
+        fun start() = onProgress(0L, totalBytes, 0.0)
+
+        fun add(count: Int) {
+            val uploaded = uploadedBytes.addAndGet(count.toLong())
+            val now = System.nanoTime()
+            val previous = lastReportAt.get()
+            if (
+                now - previous >= PROGRESS_INTERVAL_NANOS &&
+                lastReportAt.compareAndSet(previous, now)
+            ) {
+                emit(uploaded, now)
+            }
+        }
+
+        fun finish() = emit(uploadedBytes.get(), System.nanoTime())
+
+        private fun emit(uploaded: Long, now: Long) {
+            val elapsedSeconds = (now - startedAt).coerceAtLeast(1L) / 1_000_000_000.0
+            onProgress(uploaded, totalBytes, uploaded / elapsedSeconds)
+        }
     }
 }

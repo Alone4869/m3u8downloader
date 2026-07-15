@@ -179,7 +179,7 @@ class _SettingsViewState extends State<SettingsView> {
               ListTile(
                 leading: _SettingsIcon(Icons.info_outline_rounded),
                 title: Text('M3U8 视频下载器'),
-                subtitle: Text('版本 1.0.13'),
+                subtitle: Text('版本 1.0.14'),
               ),
               Divider(indent: 64),
               ListTile(

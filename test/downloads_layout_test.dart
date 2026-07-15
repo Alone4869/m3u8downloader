@@ -67,7 +67,7 @@ void main() {
     expect(find.text('没有正在下载的任务'), findsOneWidget);
     expect(find.text('管理任务'), findsOneWidget);
     expect(tester.getTopLeft(find.byKey(headerKey)).dy, 0);
-    expect(tester.getSize(find.byKey(bodyKey)).height, 326);
+    expect(tester.getSize(find.byKey(bodyKey)).height, 390);
     expect(tester.getTopLeft(find.byKey(actionsKey)).dy, 436);
   });
 }

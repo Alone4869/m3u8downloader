@@ -265,61 +265,91 @@ class _LiquidNavigationBar extends StatelessWidget {
     final downloadLabel = taskCount > 0 ? '下载 $taskCount' : '下载';
 
     return LayoutBuilder(
-      builder: (context, constraints) => LiquidGlassBottomNavBar(
+      builder: (context, constraints) => SizedBox(
         width: constraints.maxWidth,
         height: 68,
-        margin: EdgeInsets.zero,
-        itemPadding: 5,
-        selectedIndex: selectedIndex,
-        onChanged: onChanged,
-        items: [
-          const LiquidGlassTabBarItem(
-            icon: Icons.public_outlined,
-            selectedIcon: Icons.public_rounded,
-            label: '浏览器',
-          ),
-          LiquidGlassTabBarItem(
-            icon: Icons.download_outlined,
-            selectedIcon: Icons.download_rounded,
-            label: downloadLabel,
-          ),
-          const LiquidGlassTabBarItem(
-            icon: Icons.settings_outlined,
-            selectedIcon: Icons.settings_rounded,
-            label: '设置',
-          ),
-        ],
-        itemStyle: LiquidGlassNavItemStyle(
-          selectedColor: colors.primary,
-          unselectedColor: colors.onSurfaceVariant,
-          iconSize: 23,
-          labelFontSize: 11,
-          iconLabelGap: 3,
-          selectedFontWeight: FontWeight.w700,
-        ),
-        pillStyle: LiquidGlassNavPillStyle(
-          mode: LiquidGlassPillMode.none,
-          animated: true,
-          animationDuration: const Duration(milliseconds: 280),
-          animationCurve: Curves.easeOutCubic,
-          color: colors.primary.withValues(alpha: dark ? 0.18 : 0.10),
-        ),
-        style: LiquidGlassStyle(
-          shape: LiquidGlassShape.continuousRoundedRectangle(
-            cornerRadius: 28,
-            borderWidth: 0.9,
-            borderColor: Colors.white.withValues(alpha: dark ? 0.17 : 0.72),
-          ),
-          appearance: LiquidGlassAppearance(
-            color: dark ? const Color(0x40171A21) : const Color(0x30FFFFFF),
-            saturation: 1.04,
-            blur: const LiquidGlassBlur(sigmaX: 4, sigmaY: 4),
-          ),
-          refraction: const LiquidGlassRefraction(
-            distortion: 0.035,
-            distortionWidth: 20,
-            chromaticAberration: 0.0008,
-          ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Platform views such as Android WebView cannot be sampled by a
+            // Flutter backdrop shader. This translucent base keeps the glass
+            // shell identical on every page while still allowing Flutter
+            // content to remain visible through it.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: dark ? const Color(0x38171A21) : const Color(0x38FFFFFF),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: dark ? 0.20 : 0.07),
+                    blurRadius: 18,
+                    offset: const Offset(0, 7),
+                  ),
+                ],
+              ),
+            ),
+            LiquidGlassBottomNavBar(
+              width: constraints.maxWidth,
+              height: 68,
+              margin: EdgeInsets.zero,
+              itemPadding: 5,
+              selectedIndex: selectedIndex,
+              onChanged: onChanged,
+              items: [
+                const LiquidGlassTabBarItem(
+                  icon: Icons.public_outlined,
+                  selectedIcon: Icons.public_rounded,
+                  label: '浏览器',
+                ),
+                LiquidGlassTabBarItem(
+                  icon: Icons.download_outlined,
+                  selectedIcon: Icons.download_rounded,
+                  label: downloadLabel,
+                ),
+                const LiquidGlassTabBarItem(
+                  icon: Icons.settings_outlined,
+                  selectedIcon: Icons.settings_rounded,
+                  label: '设置',
+                ),
+              ],
+              itemStyle: LiquidGlassNavItemStyle(
+                selectedColor: colors.primary,
+                unselectedColor: colors.onSurfaceVariant,
+                iconSize: 23,
+                labelFontSize: 11,
+                iconLabelGap: 3,
+                selectedFontWeight: FontWeight.w700,
+              ),
+              pillStyle: LiquidGlassNavPillStyle(
+                mode: LiquidGlassPillMode.none,
+                animated: true,
+                animationDuration: const Duration(milliseconds: 280),
+                animationCurve: Curves.easeOutCubic,
+                color: colors.primary.withValues(alpha: dark ? 0.18 : 0.10),
+              ),
+              style: LiquidGlassStyle(
+                shape: LiquidGlassShape.continuousRoundedRectangle(
+                  cornerRadius: 28,
+                  borderWidth: 0.9,
+                  borderColor: Colors.white.withValues(
+                    alpha: dark ? 0.17 : 0.72,
+                  ),
+                ),
+                appearance: LiquidGlassAppearance(
+                  color: dark
+                      ? const Color(0x30171A21)
+                      : const Color(0x24FFFFFF),
+                  saturation: 1.04,
+                  blur: const LiquidGlassBlur(sigmaX: 4, sigmaY: 4),
+                ),
+                refraction: const LiquidGlassRefraction(
+                  distortion: 0.035,
+                  distortionWidth: 20,
+                  chromaticAberration: 0.0008,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1015,13 +1045,23 @@ class DownloadsPageFrame extends StatelessWidget {
       color: Colors.transparent,
       child: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
           children: [
-            header,
-            Expanded(child: body),
-            bottomBar,
-            if (navigationInset > 0) SizedBox(height: navigationInset),
+            Positioned.fill(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  header,
+                  Expanded(child: body),
+                ],
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: navigationInset,
+              child: bottomBar,
+            ),
           ],
         ),
       ),
@@ -1148,6 +1188,7 @@ class _DownloadEditBar extends StatelessWidget {
       color: colors.surface,
       child: SafeArea(
         top: false,
+        bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
           child: editing
@@ -1211,7 +1252,12 @@ class _DownloadSection extends StatelessWidget {
       return _EmptyDownloads(icon: emptyIcon, title: emptyTitle);
     }
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 28),
+      padding: EdgeInsets.fromLTRB(
+        14,
+        8,
+        14,
+        MediaQuery.paddingOf(context).bottom + 88,
+      ),
       children: [
         ...tasks.map(
           (task) => _DownloadTile(

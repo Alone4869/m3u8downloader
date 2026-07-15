@@ -611,13 +611,14 @@ class _MediaCard extends StatelessWidget {
                 color: colors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(16),
                 child: ListTile(
+                  horizontalTitleGap: 12,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   leading: Container(
-                    constraints: const BoxConstraints(minWidth: 58),
+                    width: 68,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
+                      horizontal: 6,
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
@@ -637,12 +638,16 @@ class _MediaCard extends StatelessWidget {
                     variant.detailsLabel.isEmpty
                         ? 'MP4 视频'
                         : variant.detailsLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   subtitle: Text(
                     variant.estimatedSize(media.durationSeconds).isEmpty
                         ? '点击确认并下载'
                         : '${variant.estimatedSize(media.durationSeconds)} · MP4',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   trailing: const Icon(Icons.download_rounded),
                   onTap: () => onDownload(variant),

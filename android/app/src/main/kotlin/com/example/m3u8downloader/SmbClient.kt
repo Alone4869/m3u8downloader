@@ -135,22 +135,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         val remotePath = SmbFile(targetDirectory, fileName).use { it.path }
         var activeContext = context
         try {
-            try {
-                uploadAttempt(
-                    source,
-                    remotePath,
-                    fileName,
-                    fileSize,
-                    context,
-                    PARALLEL_UPLOAD_WORKERS,
-                    PARALLEL_UPLOAD_MIN_RANGE,
-                    PARALLEL_UPLOAD_BUFFER_SIZE,
-                    false,
-                    onProgress,
-                )
-            } catch (error: Exception) {
-                if (!isOversizedRequest(error)) throw error
-                deleteRemoteFile(remotePath, context)
+            if (supportsLargeMtu(remotePath, context) == false) {
                 activeContext = compatibilityContext
                 uploadAttempt(
                     source,
@@ -164,6 +149,37 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                     true,
                     onProgress,
                 )
+            } else {
+                try {
+                    uploadAttempt(
+                        source,
+                        remotePath,
+                        fileName,
+                        fileSize,
+                        context,
+                        PARALLEL_UPLOAD_WORKERS,
+                        PARALLEL_UPLOAD_MIN_RANGE,
+                        PARALLEL_UPLOAD_BUFFER_SIZE,
+                        false,
+                        onProgress,
+                    )
+                } catch (error: Exception) {
+                    if (!isOversizedRequest(error)) throw error
+                    deleteRemoteFile(remotePath, context)
+                    activeContext = compatibilityContext
+                    uploadAttempt(
+                        source,
+                        remotePath,
+                        fileName,
+                        fileSize,
+                        compatibilityContext,
+                        COMPAT_PARALLEL_UPLOAD_WORKERS,
+                        COMPAT_PARALLEL_UPLOAD_MIN_RANGE,
+                        COMPAT_PARALLEL_UPLOAD_BUFFER_SIZE,
+                        true,
+                        onProgress,
+                    )
+                }
             }
             if (fileSize > 0L) {
                 SmbFile(remotePath, activeContext).use { uploadedFile ->
@@ -224,6 +240,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
             FileInputStream(it.fileDescriptor).use { input ->
                 SmbFileOutputStream(remoteFile, false).use { output ->
                     val buffer = ByteArray(SEQUENTIAL_UPLOAD_BUFFER_SIZE)
+                    reporter.beginTransfer()
                     while (true) {
                         val count = input.read(buffer)
                         if (count < 0) break
@@ -258,8 +275,22 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
             ((fileSize + minimumRange - 1L) / minimumRange).toInt(),
         ).coerceAtLeast(1)
         val executor = Executors.newFixedThreadPool(workerCount)
-        val futures = mutableListOf<Future<*>>()
+        val workerContexts = if (isolatedConnections) {
+            List(workerCount) { createContext(SMB_COMPAT_TRANSACTION_WINDOW) }
+        } else {
+            List(workerCount) { cifsContext }
+        }
         try {
+            if (isolatedConnections) {
+                val connectionFutures = workerContexts.map { workerContext ->
+                    executor.submit {
+                        SmbFile(remotePath, workerContext).use { it.connect() }
+                    }
+                }
+                awaitFutures(connectionFutures)
+            }
+            reporter.beginTransfer()
+            val futures = mutableListOf<Future<*>>()
             repeat(workerCount) { workerIndex ->
                 val start = fileSize / workerCount * workerIndex
                 val end = if (workerIndex == workerCount - 1) {
@@ -268,40 +299,40 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                     fileSize / workerCount * (workerIndex + 1)
                 }
                 futures += executor.submit {
-                    val workerContext = if (isolatedConnections) {
-                        createContext(SMB_COMPAT_TRANSACTION_WINDOW)
-                    } else {
-                        cifsContext
-                    }
-                    try {
-                        uploadRange(
-                            source,
-                            remotePath,
-                            fileName,
-                            start,
-                            end,
-                            workerContext,
-                            bufferSize,
-                            reporter,
-                        )
-                    } finally {
-                        if (isolatedConnections) runCatching { workerContext.close() }
-                    }
+                    uploadRange(
+                        source,
+                        remotePath,
+                        fileName,
+                        start,
+                        end,
+                        workerContexts[workerIndex],
+                        bufferSize,
+                        reporter,
+                    )
                 }
             }
-            futures.forEach { future ->
-                try {
-                    future.get()
-                } catch (error: Exception) {
-                    futures.forEach { it.cancel(true) }
-                    val cause = error.cause
-                    if (cause is Exception) throw cause
-                    throw error
-                }
-            }
+            awaitFutures(futures)
         } finally {
             executor.shutdownNow()
             executor.awaitTermination(5L, TimeUnit.SECONDS)
+            if (isolatedConnections) {
+                workerContexts.forEach { workerContext ->
+                    runCatching { workerContext.close() }
+                }
+            }
+        }
+    }
+
+    private fun awaitFutures(futures: List<Future<*>>) {
+        futures.forEach { future ->
+            try {
+                future.get()
+            } catch (error: Exception) {
+                futures.forEach { it.cancel(true) }
+                val cause = error.cause
+                if (cause is Exception) throw cause
+                throw error
+            }
         }
     }
 
@@ -348,6 +379,19 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
             current = current.cause
         }
         return false
+    }
+
+    private fun supportsLargeMtu(remotePath: String, cifsContext: CIFSContext): Boolean? {
+        return runCatching {
+            SmbFile(remotePath, cifsContext).use { remoteFile ->
+                remoteFile.connect()
+                remoteFile.treeHandle.use { tree ->
+                    val method = tree.javaClass.getMethod("hasCapability", Int::class.javaPrimitiveType)
+                        .apply { isAccessible = true }
+                    method.invoke(tree, SMB2_GLOBAL_CAP_LARGE_MTU) as Boolean
+                }
+            }
+        }.getOrNull()
     }
 
     private fun deleteRemoteFile(remotePath: String, cifsContext: CIFSContext) {
@@ -464,10 +508,11 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         private const val PARALLEL_UPLOAD_MIN_SIZE = 32L * 1024 * 1024
         private const val PARALLEL_UPLOAD_MIN_RANGE = 16L * 1024 * 1024
         private const val SMB_COMPAT_TRANSACTION_WINDOW = 64 * 1024
-        private const val COMPAT_PARALLEL_UPLOAD_WORKERS = 8
-        private const val COMPAT_PARALLEL_UPLOAD_MIN_RANGE = 8L * 1024 * 1024
+        private const val COMPAT_PARALLEL_UPLOAD_WORKERS = 24
+        private const val COMPAT_PARALLEL_UPLOAD_MIN_RANGE = 4L * 1024 * 1024
         private const val COMPAT_PARALLEL_UPLOAD_BUFFER_SIZE = 512 * 1024
         private const val PROGRESS_INTERVAL_NANOS = 200L * 1_000_000
+        private const val SMB2_GLOBAL_CAP_LARGE_MTU = 0x00000004
     }
 
     private class UploadProgressReporter(
@@ -477,9 +522,19 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
     ) {
         private val uploadedBytes = AtomicLong(0L)
         private val lastReportAt = AtomicLong(0L)
-        private val startedAt = System.nanoTime()
+        private var speedSampleAt = System.nanoTime()
+        private var speedSampleBytes = 0L
+        private var smoothedBytesPerSecond = 0.0
 
         fun start() = onProgress(0L, totalBytes, 0.0, protocol)
+
+        @Synchronized
+        fun beginTransfer() {
+            speedSampleAt = System.nanoTime()
+            speedSampleBytes = uploadedBytes.get()
+            smoothedBytesPerSecond = 0.0
+            lastReportAt.set(speedSampleAt)
+        }
 
         fun add(count: Int) {
             val uploaded = uploadedBytes.addAndGet(count.toLong())
@@ -495,9 +550,21 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
 
         fun finish() = emit(uploadedBytes.get(), System.nanoTime())
 
+        @Synchronized
         private fun emit(uploaded: Long, now: Long) {
-            val elapsedSeconds = (now - startedAt).coerceAtLeast(1L) / 1_000_000_000.0
-            onProgress(uploaded, totalBytes, uploaded / elapsedSeconds, protocol)
+            val elapsedNanos = (now - speedSampleAt).coerceAtLeast(1L)
+            val transferred = uploaded - speedSampleBytes
+            if (transferred > 0L) {
+                val currentRate = transferred * 1_000_000_000.0 / elapsedNanos
+                smoothedBytesPerSecond = if (smoothedBytesPerSecond <= 0.0) {
+                    currentRate
+                } else {
+                    currentRate * 0.45 + smoothedBytesPerSecond * 0.55
+                }
+                speedSampleAt = now
+                speedSampleBytes = uploaded
+            }
+            onProgress(uploaded, totalBytes, smoothedBytesPerSecond, protocol)
         }
     }
 }

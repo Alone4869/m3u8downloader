@@ -1,7 +1,10 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u8downloader/src/download_bridge.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('parses a native download task update', () {
     final task = DownloadTask.fromMap({
       'id': 'task-1',
@@ -50,5 +53,37 @@ void main() {
     expect(progress.fileName, 'sample.ts');
     expect(progress.progress, 1.0);
     expect(progress.bytesPerSecond, 73400320.0);
+  });
+
+  test('requests a video thumbnail from the native media entry', () async {
+    const channel = MethodChannel('m3u8_downloader/methods');
+    MethodCall? capturedCall;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      capturedCall = call;
+      return Uint8List.fromList([1, 2, 3]);
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    const task = DownloadTask(
+      id: 'task-2',
+      url: 'https://example.com/video.mp4',
+      fileName: 'video.mp4',
+      status: DownloadStatus.completed,
+      progress: 1,
+      contentUri: 'content://media/external/downloads/99',
+      fileSize: 2048,
+    );
+
+    final bytes = await DownloadBridge.instance.getVideoThumbnail(task);
+
+    expect(bytes, Uint8List.fromList([1, 2, 3]));
+    expect(capturedCall?.method, 'getVideoThumbnail');
+    expect(capturedCall?.arguments, {
+      'fileName': 'video.mp4',
+      'contentUri': 'content://media/external/downloads/99',
+      'fileSize': 2048,
+    });
   });
 }

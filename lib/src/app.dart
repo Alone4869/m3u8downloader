@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1185,13 +1184,13 @@ class _DownloadTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
               ],
-                if (task.status == DownloadStatus.completed)
-                  _VideoThumbnail(
-                    task: task,
-                    fallbackColor: _statusColor(context, task.status),
-                  )
-                else
-                  _VideoFileIcon(color: _statusColor(context, task.status)),
+              if (task.status == DownloadStatus.completed)
+                _VideoThumbnail(
+                  task: task,
+                  fallbackColor: _statusColor(context, task.status),
+                )
+              else
+                _VideoFileIcon(color: _statusColor(context, task.status)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

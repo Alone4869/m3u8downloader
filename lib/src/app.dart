@@ -262,94 +262,74 @@ class _LiquidNavigationBar extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
+    final browserSelected = selectedIndex == 0;
     final downloadLabel = taskCount > 0 ? '下载 $taskCount' : '下载';
 
     return LayoutBuilder(
-      builder: (context, constraints) => SizedBox(
+      builder: (context, constraints) => LiquidGlassBottomNavBar(
         width: constraints.maxWidth,
         height: 68,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Platform views such as Android WebView cannot be sampled by a
-            // Flutter backdrop shader. This translucent base keeps the glass
-            // shell identical on every page while still allowing Flutter
-            // content to remain visible through it.
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: dark ? const Color(0x38171A21) : const Color(0x38FFFFFF),
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: dark ? 0.20 : 0.07),
-                    blurRadius: 18,
-                    offset: const Offset(0, 7),
-                  ),
-                ],
-              ),
-            ),
-            LiquidGlassBottomNavBar(
-              width: constraints.maxWidth,
-              height: 68,
-              margin: EdgeInsets.zero,
-              itemPadding: 5,
-              selectedIndex: selectedIndex,
-              onChanged: onChanged,
-              items: [
-                const LiquidGlassTabBarItem(
-                  icon: Icons.public_outlined,
-                  selectedIcon: Icons.public_rounded,
-                  label: '浏览器',
-                ),
-                LiquidGlassTabBarItem(
-                  icon: Icons.download_outlined,
-                  selectedIcon: Icons.download_rounded,
-                  label: downloadLabel,
-                ),
-                const LiquidGlassTabBarItem(
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings_rounded,
-                  label: '设置',
-                ),
-              ],
-              itemStyle: LiquidGlassNavItemStyle(
-                selectedColor: colors.primary,
-                unselectedColor: colors.onSurfaceVariant,
-                iconSize: 23,
-                labelFontSize: 11,
-                iconLabelGap: 3,
-                selectedFontWeight: FontWeight.w700,
-              ),
-              pillStyle: LiquidGlassNavPillStyle(
-                mode: LiquidGlassPillMode.none,
-                animated: true,
-                animationDuration: const Duration(milliseconds: 280),
-                animationCurve: Curves.easeOutCubic,
-                color: colors.primary.withValues(alpha: dark ? 0.18 : 0.10),
-              ),
-              style: LiquidGlassStyle(
-                shape: LiquidGlassShape.continuousRoundedRectangle(
-                  cornerRadius: 28,
-                  borderWidth: 0.9,
-                  borderColor: Colors.white.withValues(
-                    alpha: dark ? 0.17 : 0.72,
-                  ),
-                ),
-                appearance: LiquidGlassAppearance(
-                  color: dark
-                      ? const Color(0x30171A21)
-                      : const Color(0x24FFFFFF),
-                  saturation: 1.04,
-                  blur: const LiquidGlassBlur(sigmaX: 4, sigmaY: 4),
-                ),
-                refraction: const LiquidGlassRefraction(
-                  distortion: 0.035,
-                  distortionWidth: 20,
-                  chromaticAberration: 0.0008,
-                ),
-              ),
-            ),
-          ],
+        margin: EdgeInsets.zero,
+        itemPadding: 5,
+        selectedIndex: selectedIndex,
+        onChanged: onChanged,
+        items: [
+          const LiquidGlassTabBarItem(
+            icon: Icons.public_outlined,
+            selectedIcon: Icons.public_rounded,
+            label: '浏览器',
+          ),
+          LiquidGlassTabBarItem(
+            icon: Icons.download_outlined,
+            selectedIcon: Icons.download_rounded,
+            label: downloadLabel,
+          ),
+          const LiquidGlassTabBarItem(
+            icon: Icons.settings_outlined,
+            selectedIcon: Icons.settings_rounded,
+            label: '设置',
+          ),
+        ],
+        itemStyle: LiquidGlassNavItemStyle(
+          selectedColor: colors.primary,
+          unselectedColor: colors.onSurfaceVariant,
+          iconSize: 23,
+          labelFontSize: 11,
+          iconLabelGap: 3,
+          selectedFontWeight: FontWeight.w700,
+        ),
+        pillStyle: LiquidGlassNavPillStyle(
+          mode: LiquidGlassPillMode.none,
+          animated: true,
+          animationDuration: const Duration(milliseconds: 280),
+          animationCurve: Curves.easeOutCubic,
+          color: colors.primary.withValues(alpha: dark ? 0.18 : 0.10),
+        ),
+        style: LiquidGlassStyle(
+          shape: LiquidGlassShape.continuousRoundedRectangle(
+            cornerRadius: 28,
+            borderWidth: 0.8,
+            borderColor: Colors.white.withValues(alpha: dark ? 0.12 : 0.30),
+          ),
+          appearance: LiquidGlassAppearance(
+            // Android Platform Views are unavailable to Flutter's backdrop
+            // sampler. Strengthen the glass material itself on the browser
+            // page instead of painting an extra white layer underneath it.
+            color: dark
+                ? (browserSelected
+                      ? const Color(0x76171A21)
+                      : const Color(0x30171A21))
+                : (browserSelected
+                      ? const Color(0x72FFFFFF)
+                      : const Color(0x24FFFFFF)),
+            saturation: browserSelected ? 0.92 : 1.04,
+            blur: const LiquidGlassBlur(sigmaX: 4, sigmaY: 4),
+          ),
+          refraction: const LiquidGlassRefraction(
+            distortion: 0.035,
+            distortionWidth: 20,
+            chromaticAberration: 0.0008,
+          ),
         ),
       ),
     );
@@ -1183,16 +1163,16 @@ class _DownloadEditBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Material(
-      color: colors.surface,
-      child: SafeArea(
-        top: false,
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
-          child: editing
-              ? Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
+      child: editing
+          ? AppSurface(
+              borderRadius: 18,
+              elevated: true,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                height: 48,
+                child: Row(
                   children: [
                     TextButton(onPressed: onCancel, child: const Text('取消')),
                     TextButton(
@@ -1212,17 +1192,17 @@ class _DownloadEditBar extends StatelessWidget {
                       label: Text('上传 $selectedCount'),
                     ),
                   ],
-                )
-              : Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.tonalIcon(
-                    onPressed: hasTasks ? onEdit : null,
-                    icon: const Icon(Icons.checklist_rounded),
-                    label: const Text('管理任务'),
-                  ),
                 ),
-        ),
-      ),
+              ),
+            )
+          : Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.tonalIcon(
+                onPressed: hasTasks ? onEdit : null,
+                icon: const Icon(Icons.checklist_rounded),
+                label: const Text('管理任务'),
+              ),
+            ),
     );
   }
 }

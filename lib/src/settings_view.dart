@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'browser_settings.dart';
 import 'download_bridge.dart';
 import 'smb_settings.dart';
 
@@ -12,6 +13,7 @@ class SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<SettingsView> {
   SmbConfig? _smbConfig;
+  String _browserHomeUrl = defaultBrowserHomeUrl;
 
   @override
   void initState() {
@@ -20,8 +22,83 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _reload() async {
-    final config = await SmbSettingsStore.instance.load();
-    if (mounted) setState(() => _smbConfig = config);
+    final configFuture = SmbSettingsStore.instance.load();
+    final homeUrlFuture = BrowserSettingsStore.instance.load();
+    final config = await configFuture;
+    final homeUrl = await homeUrlFuture;
+    if (mounted) {
+      setState(() {
+        _smbConfig = config;
+        _browserHomeUrl = homeUrl;
+      });
+    }
+  }
+
+  Future<void> _editBrowserHomeUrl() async {
+    final formKey = GlobalKey<FormState>();
+    final controller = TextEditingController(text: _browserHomeUrl);
+    try {
+      final value = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.home_outlined),
+          title: const Text('浏览器默认网址'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: '主页网址',
+                hintText: 'https://example.com',
+                prefixIcon: Icon(Icons.language_outlined),
+              ),
+              validator: (input) {
+                try {
+                  normalizeBrowserHomeUrl(input ?? '');
+                  return null;
+                } on FormatException catch (error) {
+                  return error.message.toString();
+                }
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, defaultBrowserHomeUrl),
+              child: const Text('恢复默认'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(
+                  dialogContext,
+                  normalizeBrowserHomeUrl(controller.text),
+                );
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      );
+      if (value == null) return;
+      await BrowserSettingsStore.instance.save(value);
+      if (!mounted) return;
+      setState(() => _browserHomeUrl = value);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('浏览器默认网址已保存')));
+    } finally {
+      controller.dispose();
+    }
   }
 
   @override
@@ -33,21 +110,33 @@ class _SettingsViewState extends State<SettingsView> {
         children: [
           const _SettingsHero(),
           const _SettingsHeader('通用设置'),
-          const _SettingsCard(
+          _SettingsCard(
             children: [
-              ListTile(
+              const ListTile(
                 leading: _SettingsIcon(Icons.folder_outlined),
                 title: Text('下载位置'),
                 subtitle: Text('下载/M3U8 Downloader'),
               ),
-              Divider(indent: 64),
+              const Divider(indent: 64),
               ListTile(
+                leading: const _SettingsIcon(Icons.home_outlined),
+                title: const Text('浏览器默认网址'),
+                subtitle: Text(
+                  _browserHomeUrl,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _editBrowserHomeUrl,
+              ),
+              const Divider(indent: 64),
+              const ListTile(
                 leading: _SettingsIcon(Icons.bolt_outlined),
                 title: Text('高速下载'),
                 subtitle: Text('每个任务最多 6 路连接'),
               ),
-              Divider(indent: 64),
-              ListTile(
+              const Divider(indent: 64),
+              const ListTile(
                 leading: _SettingsIcon(Icons.shield_outlined),
                 title: Text('数据保护'),
                 subtitle: Text('升级请直接覆盖安装；任务记录与非敏感设置跟随系统备份'),

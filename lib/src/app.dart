@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
+import 'browser_settings.dart';
 import 'download_bridge.dart';
 import 'settings_view.dart';
 import 'smb_upload.dart';
-
-const _homeUrl = 'https://savetwitter.net/zh-cn3';
 
 class M3u8DownloaderApp extends StatelessWidget {
   const M3u8DownloaderApp({super.key});
@@ -302,15 +301,41 @@ class BrowserView extends StatefulWidget {
 }
 
 class _BrowserViewState extends State<BrowserView> {
-  final _addressController = TextEditingController(text: _homeUrl);
+  final _addressController = TextEditingController(text: defaultBrowserHomeUrl);
   final _addressFocus = FocusNode();
   final Set<String> _handledUrls = {};
   InAppWebViewController? _webViewController;
+  String _homeUrl = defaultBrowserHomeUrl;
+  bool _homeUrlReady = false;
   double _progress = 0;
   String _pageTitle = '视频解析';
   bool _canGoBack = false;
   bool _canGoForward = false;
   bool _dialogOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    BrowserSettingsStore.instance.homeUrl.addListener(_onHomeUrlChanged);
+    unawaited(_loadHomeUrl());
+  }
+
+  Future<void> _loadHomeUrl() async {
+    final homeUrl = await BrowserSettingsStore.instance.load();
+    if (!mounted) return;
+    setState(() {
+      _homeUrl = homeUrl;
+      _homeUrlReady = true;
+      if (_webViewController == null && !_addressFocus.hasFocus) {
+        _addressController.text = homeUrl;
+      }
+    });
+  }
+
+  void _onHomeUrlChanged() {
+    if (!mounted) return;
+    setState(() => _homeUrl = BrowserSettingsStore.instance.homeUrl.value);
+  }
 
   Future<bool> handleSystemBack() async {
     final controller = _webViewController;
@@ -343,6 +368,7 @@ class _BrowserViewState extends State<BrowserView> {
 
   @override
   void dispose() {
+    BrowserSettingsStore.instance.homeUrl.removeListener(_onHomeUrlChanged);
     _addressController.dispose();
     _addressFocus.dispose();
     super.dispose();
@@ -588,78 +614,80 @@ class _BrowserViewState extends State<BrowserView> {
           if (_progress < 1)
             LinearProgressIndicator(value: _progress == 0 ? null : _progress),
           Expanded(
-            child: InAppWebView(
-              initialUrlRequest: URLRequest(url: WebUri(_homeUrl)),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                domStorageEnabled: true,
-                databaseEnabled: true,
-                useShouldOverrideUrlLoading: true,
-                useOnDownloadStart: true,
-                mediaPlaybackRequiresUserGesture: false,
-                mixedContentMode:
-                    MixedContentMode.MIXED_CONTENT_COMPATIBILITY_MODE,
-              ),
-              onWebViewCreated: (controller) {
-                _webViewController = controller;
-                controller.addJavaScriptHandler(
-                  handlerName: 'mediaLink',
-                  callback: (arguments) {
-                    if (arguments.isNotEmpty) {
+            child: !_homeUrlReady
+                ? const Center(child: CircularProgressIndicator())
+                : InAppWebView(
+                    initialUrlRequest: URLRequest(url: WebUri(_homeUrl)),
+                    initialSettings: InAppWebViewSettings(
+                      javaScriptEnabled: true,
+                      domStorageEnabled: true,
+                      databaseEnabled: true,
+                      useShouldOverrideUrlLoading: true,
+                      useOnDownloadStart: true,
+                      mediaPlaybackRequiresUserGesture: false,
+                      mixedContentMode:
+                          MixedContentMode.MIXED_CONTENT_COMPATIBILITY_MODE,
+                    ),
+                    onWebViewCreated: (controller) {
+                      _webViewController = controller;
+                      controller.addJavaScriptHandler(
+                        handlerName: 'mediaLink',
+                        callback: (arguments) {
+                          if (arguments.isNotEmpty) {
+                            unawaited(
+                              _offerDownload(
+                                arguments.first.toString(),
+                                pageTitle: arguments.length > 1
+                                    ? arguments[1].toString()
+                                    : null,
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                    shouldOverrideUrlLoading: (controller, action) async {
+                      final url = action.request.url?.toString();
+                      if (url != null && _isMediaUrl(url)) {
+                        unawaited(_offerDownload(url, pageTitle: _pageTitle));
+                        return NavigationActionPolicy.CANCEL;
+                      }
+                      return NavigationActionPolicy.ALLOW;
+                    },
+                    onDownloadStartRequest: (controller, request) {
                       unawaited(
                         _offerDownload(
-                          arguments.first.toString(),
-                          pageTitle: arguments.length > 1
-                              ? arguments[1].toString()
-                              : null,
+                          request.url.toString(),
+                          pageTitle: request.suggestedFilename ?? _pageTitle,
+                          force: true,
                         ),
                       );
-                    }
-                  },
-                );
-              },
-              shouldOverrideUrlLoading: (controller, action) async {
-                final url = action.request.url?.toString();
-                if (url != null && _isMediaUrl(url)) {
-                  unawaited(_offerDownload(url, pageTitle: _pageTitle));
-                  return NavigationActionPolicy.CANCEL;
-                }
-                return NavigationActionPolicy.ALLOW;
-              },
-              onDownloadStartRequest: (controller, request) {
-                unawaited(
-                  _offerDownload(
-                    request.url.toString(),
-                    pageTitle: request.suggestedFilename ?? _pageTitle,
-                    force: true,
+                    },
+                    onLoadResource: (controller, resource) {
+                      final url = resource.url.toString();
+                      if (_isMediaUrl(url)) {
+                        unawaited(_offerDownload(url, pageTitle: _pageTitle));
+                      }
+                    },
+                    onProgressChanged: (controller, progress) {
+                      if (mounted) setState(() => _progress = progress / 100);
+                    },
+                    onTitleChanged: (controller, title) {
+                      if (mounted && title != null) {
+                        setState(() => _pageTitle = title);
+                      }
+                    },
+                    onUpdateVisitedHistory: (controller, url, _) {
+                      if (url != null && !_addressFocus.hasFocus) {
+                        _addressController.text = url.toString();
+                      }
+                      unawaited(_updateNavigation());
+                    },
+                    onLoadStop: (controller, url) async {
+                      await controller.evaluateJavascript(source: _mediaScript);
+                      await _updateNavigation();
+                    },
                   ),
-                );
-              },
-              onLoadResource: (controller, resource) {
-                final url = resource.url.toString();
-                if (_isMediaUrl(url)) {
-                  unawaited(_offerDownload(url, pageTitle: _pageTitle));
-                }
-              },
-              onProgressChanged: (controller, progress) {
-                if (mounted) setState(() => _progress = progress / 100);
-              },
-              onTitleChanged: (controller, title) {
-                if (mounted && title != null) {
-                  setState(() => _pageTitle = title);
-                }
-              },
-              onUpdateVisitedHistory: (controller, url, _) {
-                if (url != null && !_addressFocus.hasFocus) {
-                  _addressController.text = url.toString();
-                }
-                unawaited(_updateNavigation());
-              },
-              onLoadStop: (controller, url) async {
-                await controller.evaluateJavascript(source: _mediaScript);
-                await _updateNavigation();
-              },
-            ),
           ),
         ],
       ),

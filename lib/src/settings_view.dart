@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'browser_settings.dart';
 import 'download_bridge.dart';
+import 'glass_surface.dart';
 import 'smb_settings.dart';
 
 class SettingsView extends StatefulWidget {
@@ -104,6 +105,7 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -255,9 +257,14 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
+    return GlassSurface(
+      borderRadius: 22,
+      blurSigma: 18,
+      tintStrength: 0.76,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(children: children),
+      ),
     );
   }
 }

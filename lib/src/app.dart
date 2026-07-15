@@ -6,6 +6,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'browser_settings.dart';
 import 'download_bridge.dart';
+import 'glass_surface.dart';
 import 'settings_view.dart';
 import 'smb_upload.dart';
 
@@ -54,10 +55,10 @@ ThemeData _buildAppTheme(Brightness brightness) {
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      height: 72,
+      height: 68,
       elevation: 0,
-      backgroundColor: dark ? const Color(0xFF171920) : Colors.white,
-      indicatorColor: scheme.primaryContainer,
+      backgroundColor: Colors.transparent,
+      indicatorColor: scheme.primary.withValues(alpha: dark ? 0.30 : 0.16),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => base.textTheme.labelMedium?.copyWith(
           color: states.contains(WidgetState.selected)
@@ -78,9 +79,16 @@ ThemeData _buildAppTheme(Brightness brightness) {
     ),
     dialogTheme: DialogThemeData(
       elevation: 18,
-      backgroundColor: dark ? const Color(0xFF181B22) : Colors.white,
+      backgroundColor: dark
+          ? const Color(0xFF181B22).withValues(alpha: 0.90)
+          : Colors.white.withValues(alpha: 0.92),
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(
+          color: Colors.white.withValues(alpha: dark ? 0.14 : 0.65),
+        ),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -204,60 +212,61 @@ class _HomeScreenState extends State<HomeScreen> {
           statusBarBrightness: dark ? Brightness.dark : Brightness.light,
           systemStatusBarContrastEnforced: false,
         ),
-        child: Scaffold(
-          body: FullScreenPageStack(
-            index: _selectedIndex,
-            children: [
-              BrowserView(key: _browserKey),
-              DownloadsView(
-                key: _downloadsKey,
-                onCountChanged: (count) {
-                  if (mounted && count != _taskCount) {
-                    setState(() => _taskCount = count);
-                  }
-                },
-              ),
-              const SettingsView(),
-            ],
-          ),
-          bottomNavigationBar: DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outlineVariant.withAlpha(90),
+        child: GlassBackdrop(
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: FullScreenPageStack(
+              index: _selectedIndex,
+              children: [
+                BrowserView(key: _browserKey),
+                DownloadsView(
+                  key: _downloadsKey,
+                  onCountChanged: (count) {
+                    if (mounted && count != _taskCount) {
+                      setState(() => _taskCount = count);
+                    }
+                  },
                 ),
-              ),
-            ),
-            child: NavigationBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: _selectDestination,
-              destinations: [
-                const NavigationDestination(
-                  icon: Icon(Icons.public_outlined),
-                  selectedIcon: Icon(Icons.public),
-                  label: '浏览器',
-                ),
-                NavigationDestination(
-                  icon: Badge(
-                    isLabelVisible: _taskCount > 0,
-                    label: Text('$_taskCount'),
-                    child: const Icon(Icons.download_outlined),
-                  ),
-                  selectedIcon: Badge(
-                    isLabelVisible: _taskCount > 0,
-                    label: Text('$_taskCount'),
-                    child: const Icon(Icons.download),
-                  ),
-                  label: '下载',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings),
-                  label: '设置',
-                ),
+                const SettingsView(),
               ],
+            ),
+            bottomNavigationBar: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: GlassSurface(
+                borderRadius: 30,
+                blurSigma: 24,
+                tintStrength: 0.92,
+                child: NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _selectDestination,
+                  destinations: [
+                    const NavigationDestination(
+                      icon: Icon(Icons.public_outlined),
+                      selectedIcon: Icon(Icons.public),
+                      label: '浏览器',
+                    ),
+                    NavigationDestination(
+                      icon: Badge(
+                        isLabelVisible: _taskCount > 0,
+                        label: Text('$_taskCount'),
+                        child: const Icon(Icons.download_outlined),
+                      ),
+                      selectedIcon: Badge(
+                        isLabelVisible: _taskCount > 0,
+                        label: Text('$_taskCount'),
+                        child: const Icon(Icons.download),
+                      ),
+                      label: '下载',
+                    ),
+                    const NavigationDestination(
+                      icon: Icon(Icons.settings_outlined),
+                      selectedIcon: Icon(Icons.settings),
+                      label: '设置',
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -951,7 +960,7 @@ class DownloadsPageFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Theme.of(context).scaffoldBackgroundColor,
+      color: Colors.transparent,
       child: SafeArea(
         bottom: false,
         child: Column(
@@ -1012,21 +1021,34 @@ class DownloadsHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
+          GlassSurface(
+            borderRadius: 18,
+            blurSigma: 16,
+            tintStrength: 0.78,
+            showShadow: false,
             child: TabBar(
               key: const ValueKey('downloads-tabs'),
               controller: controller,
               dividerColor: Colors.transparent,
               indicator: BoxDecoration(
-                color: colors.primaryContainer,
+                gradient: LinearGradient(
+                  colors: [
+                    colors.primary.withValues(alpha: 0.78),
+                    colors.tertiary.withValues(alpha: 0.62),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.primary.withValues(alpha: 0.22),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
               indicatorSize: TabBarIndicatorSize.tab,
-              labelColor: colors.onPrimaryContainer,
+              labelColor: Colors.white,
               unselectedLabelColor: colors.onSurfaceVariant,
               labelStyle: const TextStyle(
                 fontSize: 15,

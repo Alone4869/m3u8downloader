@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'download_bridge.dart';
+import 'glass_surface.dart';
 import 'settings_view.dart';
 import 'smb_settings.dart';
 
@@ -124,101 +125,124 @@ class _UploadProgressDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return AlertDialog(
-      title: const Text('正在上传到 SMB'),
-      content: SizedBox(
-        width: 390,
-        child: ValueListenableBuilder<SmbUploadProgress?>(
-          valueListenable: progress,
-          builder: (context, value, _) {
-            final speed = value == null
-                ? '正在建立高速连接…'
-                : '${_formatRate(value.bytesPerSecond)} · '
-                      '${value.fileIndex + 1}/${value.fileCount}';
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: colors.primaryContainer,
-                        borderRadius: BorderRadius.circular(17),
+    return Dialog(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      child: GlassSurface(
+        borderRadius: 28,
+        blurSigma: 28,
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+        child: SizedBox(
+          width: 390,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '正在上传到 SMB',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 18),
+              ValueListenableBuilder<SmbUploadProgress?>(
+                valueListenable: progress,
+                builder: (context, value, _) {
+                  final speed = value == null
+                      ? '正在建立高速连接…'
+                      : '${_formatRate(value.bytesPerSecond)} · '
+                            '${value.fileIndex + 1}/${value.fileCount}';
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: colors.primaryContainer,
+                              borderRadius: BorderRadius.circular(17),
+                            ),
+                            child: Icon(
+                              Icons.cloud_upload_outlined,
+                              color: colors.onPrimaryContainer,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  value?.fileName ?? '准备上传 $fileCount 个文件',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  speed,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  value?.protocol ?? '正在协商 SMB 版本…',
+                                  style: Theme.of(context).textTheme.labelMedium
+                                      ?.copyWith(
+                                        color: value == null
+                                            ? colors.onSurfaceVariant
+                                            : colors.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Icon(
-                        Icons.cloud_upload_outlined,
-                        color: colors.onPrimaryContainer,
+                      const SizedBox(height: 20),
+                      LinearProgressIndicator(
+                        value: value?.progress,
+                        minHeight: 8,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            value?.fileName ?? '准备上传 $fileCount 个文件',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            speed,
-                            style: Theme.of(context).textTheme.bodyMedium
+                            value == null
+                                ? '协商 SMB 2/3 连接'
+                                : '${_formatBytes(value.uploadedBytes)} / ${_formatBytes(value.totalBytes)}',
+                            style: Theme.of(context).textTheme.labelMedium
                                 ?.copyWith(color: colors.onSurfaceVariant),
                           ),
-                          const SizedBox(height: 3),
                           Text(
-                            value?.protocol ?? '正在协商 SMB 版本…',
-                            style: Theme.of(context).textTheme.labelMedium
+                            value?.progress == null
+                                ? '—'
+                                : '${(value!.progress! * 100).round()}%',
+                            style: Theme.of(context).textTheme.labelLarge
                                 ?.copyWith(
-                                  color: value == null
-                                      ? colors.onSurfaceVariant
-                                      : colors.primary,
-                                  fontWeight: FontWeight.w700,
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w800,
                                 ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                LinearProgressIndicator(
-                  value: value?.progress,
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      value == null
-                          ? '协商 SMB 2/3 连接'
-                          : '${_formatBytes(value.uploadedBytes)} / ${_formatBytes(value.totalBytes)}',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                    Text(
-                      value?.progress == null
-                          ? '—'
-                          : '${(value!.progress! * 100).round()}%',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

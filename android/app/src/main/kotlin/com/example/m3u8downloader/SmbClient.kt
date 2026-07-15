@@ -46,8 +46,11 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
             setProperty("jcifs.smb.client.soTimeout", "60000")
             setProperty("jcifs.smb.client.useLargeReadWrite", "true")
             setProperty("jcifs.smb.client.tcpNoDelay", "true")
-            setProperty("jcifs.smb.client.snd_buf_size", SMB_TRANSPORT_BUFFER.toString())
-            setProperty("jcifs.smb.client.rcv_buf_size", SMB_TRANSPORT_BUFFER.toString())
+            setProperty("jcifs.smb.client.snd_buf_size", SMB_IO_WINDOW.toString())
+            setProperty("jcifs.smb.client.rcv_buf_size", SMB_IO_WINDOW.toString())
+            // SMB2 negotiation also caps writes to transaction_buf_size. Its
+            // jcifs-ng default is only about 64 KiB, regardless of snd_buf_size.
+            setProperty("jcifs.smb.client.transaction_buf_size", SMB_IO_WINDOW.toString())
             setProperty("jcifs.smb.client.maxMpxCount", "64")
         }
         BaseContext(PropertyConfiguration(properties)).withCredentials(
@@ -298,11 +301,12 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
 
     companion object {
-        // jcifs-ng otherwise caps SMB2 writes at roughly 64 KiB. A 1 MiB
-        // negotiated write keeps a LAN link busy without excessive Android GC.
-        private const val SMB_TRANSPORT_BUFFER = 1024 * 1024
-        private const val SEQUENTIAL_UPLOAD_BUFFER_SIZE = 8 * 1024 * 1024
-        private const val PARALLEL_UPLOAD_BUFFER_SIZE = 1024 * 1024
+        // Match the desktop uploader's 16 MiB buffering. jcifs-ng takes the
+        // minimum of this transaction window, its socket buffer and the NAS's
+        // negotiated SMB2/3 maximum, so all three must be raised together.
+        private const val SMB_IO_WINDOW = 16 * 1024 * 1024
+        private const val SEQUENTIAL_UPLOAD_BUFFER_SIZE = SMB_IO_WINDOW
+        private const val PARALLEL_UPLOAD_BUFFER_SIZE = 8 * 1024 * 1024
         private const val PARALLEL_UPLOAD_WORKERS = 4
         private const val PARALLEL_UPLOAD_MIN_SIZE = 32L * 1024 * 1024
         private const val PARALLEL_UPLOAD_MIN_RANGE = 16L * 1024 * 1024

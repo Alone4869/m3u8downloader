@@ -201,6 +201,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                 maxWorkers,
                 minimumRange,
                 bufferSize,
+                compatibilityMode,
                 reporter,
             )
         } else {
@@ -243,6 +244,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         maxWorkers: Int,
         minimumRange: Long,
         bufferSize: Int,
+        isolatedConnections: Boolean,
         reporter: UploadProgressReporter,
     ) {
         SmbFile(remotePath, cifsContext).use { remoteFile ->
@@ -266,16 +268,25 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                     fileSize / workerCount * (workerIndex + 1)
                 }
                 futures += executor.submit {
-                    uploadRange(
-                        source,
-                        remotePath,
-                        fileName,
-                        start,
-                        end,
-                        cifsContext,
-                        bufferSize,
-                        reporter,
-                    )
+                    val workerContext = if (isolatedConnections) {
+                        createContext(SMB_COMPAT_TRANSACTION_WINDOW)
+                    } else {
+                        cifsContext
+                    }
+                    try {
+                        uploadRange(
+                            source,
+                            remotePath,
+                            fileName,
+                            start,
+                            end,
+                            workerContext,
+                            bufferSize,
+                            reporter,
+                        )
+                    } finally {
+                        if (isolatedConnections) runCatching { workerContext.close() }
+                    }
                 }
             }
             futures.forEach { future ->
@@ -382,7 +393,11 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
             DialectVersion.SMB1 -> "SMB 1"
             null -> "SMB 2/3"
         }
-        return if (compatibilityMode) "$version · 64KB 兼容模式" else "$version · 高速模式"
+        return if (compatibilityMode) {
+            "$version · $COMPAT_PARALLEL_UPLOAD_WORKERS 连接 × 64KB"
+        } else {
+            "$version · 高速模式"
+        }
     }
 
     private fun supportsRandomAccess(uri: Uri, fileSize: Long): Boolean {
@@ -449,8 +464,8 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         private const val PARALLEL_UPLOAD_MIN_SIZE = 32L * 1024 * 1024
         private const val PARALLEL_UPLOAD_MIN_RANGE = 16L * 1024 * 1024
         private const val SMB_COMPAT_TRANSACTION_WINDOW = 64 * 1024
-        private const val COMPAT_PARALLEL_UPLOAD_WORKERS = 24
-        private const val COMPAT_PARALLEL_UPLOAD_MIN_RANGE = 4L * 1024 * 1024
+        private const val COMPAT_PARALLEL_UPLOAD_WORKERS = 8
+        private const val COMPAT_PARALLEL_UPLOAD_MIN_RANGE = 8L * 1024 * 1024
         private const val COMPAT_PARALLEL_UPLOAD_BUFFER_SIZE = 512 * 1024
         private const val PROGRESS_INTERVAL_NANOS = 200L * 1_000_000
     }

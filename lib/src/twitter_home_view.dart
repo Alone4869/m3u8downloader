@@ -116,9 +116,16 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
         ? 'twitter'
         : info.authorUsername;
     final suffix = info.media.length > 1 ? '_${mediaIndex + 1}' : '';
-    final controller = TextEditingController(
-      text: _safeFileName('${username}_${info.tweetId}$suffix-$quality.mp4'),
+    final initialFileName = _safeFileName(
+      '${username}_${info.tweetId}$suffix-$quality.mp4',
     );
+    final controller = TextEditingController(text: initialFileName)
+      ..selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: initialFileName.toLowerCase().endsWith('.mp4')
+            ? initialFileName.length - 4
+            : initialFileName.length,
+      );
     try {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -526,7 +533,10 @@ class _VideoResult extends StatelessWidget {
               ),
               if (info.text.isNotEmpty) ...[
                 const SizedBox(height: 14),
-                Text(info.text, style: Theme.of(context).textTheme.bodyLarge),
+                SelectableText(
+                  info.text,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
               ],
             ],
           ),

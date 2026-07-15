@@ -75,6 +75,7 @@ class SmbUploadProgress {
     required this.uploadedBytes,
     required this.totalBytes,
     required this.bytesPerSecond,
+    required this.protocol,
   });
 
   factory SmbUploadProgress.fromMap(Map<Object?, Object?> map) =>
@@ -85,6 +86,7 @@ class SmbUploadProgress {
         uploadedBytes: (map['uploadedBytes'] as num?)?.toInt() ?? 0,
         totalBytes: (map['totalBytes'] as num?)?.toInt() ?? 0,
         bytesPerSecond: (map['bytesPerSecond'] as num?)?.toDouble() ?? 0,
+        protocol: map['protocol'] as String? ?? '正在协商 SMB 版本…',
       );
 
   final int fileIndex;
@@ -93,6 +95,7 @@ class SmbUploadProgress {
   final int uploadedBytes;
   final int totalBytes;
   final double bytesPerSecond;
+  final String protocol;
 
   double? get progress =>
       totalBytes > 0 ? (uploadedBytes / totalBytes).clamp(0.0, 1.0) : null;

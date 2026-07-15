@@ -11,6 +11,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import jcifs.CIFSContext
+import jcifs.DialectVersion
 import jcifs.config.PropertyConfiguration
 import jcifs.context.BaseContext
 import jcifs.smb.NtlmPasswordAuthenticator
@@ -106,7 +107,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                     fileName,
                     fileSizes.getOrNull(index) ?: 0L,
                 ) ?: error("未找到或无法读取本地文件：$fileName")
-                uploadFile(source, targetDirectory, fileName) { uploadedBytes, totalBytes, bytesPerSecond ->
+                uploadFile(source, targetDirectory, fileName) { uploadedBytes, totalBytes, bytesPerSecond, protocol ->
                     onProgress(
                         mapOf(
                             "fileIndex" to index,
@@ -115,6 +116,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                             "uploadedBytes" to uploadedBytes,
                             "totalBytes" to totalBytes,
                             "bytesPerSecond" to bytesPerSecond,
+                            "protocol" to protocol,
                         ),
                     )
                 }
@@ -127,7 +129,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         source: Uri,
         targetDirectory: SmbFile,
         fileName: String,
-        onProgress: (Long, Long, Double) -> Unit,
+        onProgress: (Long, Long, Double, String) -> Unit,
     ) {
         val fileSize = localFileSize(source)
         val remotePath = SmbFile(targetDirectory, fileName).use { it.path }
@@ -143,6 +145,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                     PARALLEL_UPLOAD_WORKERS,
                     PARALLEL_UPLOAD_MIN_RANGE,
                     PARALLEL_UPLOAD_BUFFER_SIZE,
+                    false,
                     onProgress,
                 )
             } catch (error: Exception) {
@@ -158,6 +161,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
                     COMPAT_PARALLEL_UPLOAD_WORKERS,
                     COMPAT_PARALLEL_UPLOAD_MIN_RANGE,
                     COMPAT_PARALLEL_UPLOAD_BUFFER_SIZE,
+                    true,
                     onProgress,
                 )
             }
@@ -181,9 +185,11 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         maxWorkers: Int,
         minimumRange: Long,
         bufferSize: Int,
-        onProgress: (Long, Long, Double) -> Unit,
+        compatibilityMode: Boolean,
+        onProgress: (Long, Long, Double, String) -> Unit,
     ) {
-        val reporter = UploadProgressReporter(fileSize, onProgress)
+        val protocol = negotiatedProtocol(remotePath, cifsContext, compatibilityMode)
+        val reporter = UploadProgressReporter(fileSize, protocol, onProgress)
         reporter.start()
         if (fileSize >= PARALLEL_UPLOAD_MIN_SIZE && supportsRandomAccess(source, fileSize)) {
             uploadParallel(
@@ -341,6 +347,44 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
         }
     }
 
+    private fun negotiatedProtocol(
+        remotePath: String,
+        cifsContext: CIFSContext,
+        compatibilityMode: Boolean,
+    ): String {
+        val dialect = runCatching {
+            SmbFile(remotePath, cifsContext).use { remoteFile ->
+                remoteFile.connect()
+                remoteFile.treeHandle.use { tree ->
+                    val sessionMethod = tree.javaClass.getMethod("getSession").apply {
+                        isAccessible = true
+                    }
+                    val session = sessionMethod.invoke(tree)
+                    val transportMethod = session.javaClass.getMethod("getTransport").apply {
+                        isAccessible = true
+                    }
+                    val transport = transportMethod.invoke(session)
+                    val negotiateMethod = transport.javaClass
+                        .getDeclaredMethod("getNegotiateResponse")
+                        .apply { isAccessible = true }
+                    val response = negotiateMethod.invoke(transport)
+                    response.javaClass.getMethod("getSelectedDialect").invoke(response)
+                        as? DialectVersion
+                }
+            }
+        }.getOrNull()
+        val version = when (dialect) {
+            DialectVersion.SMB202 -> "SMB 2.0.2"
+            DialectVersion.SMB210 -> "SMB 2.1"
+            DialectVersion.SMB300 -> "SMB 3.0"
+            DialectVersion.SMB302 -> "SMB 3.0.2"
+            DialectVersion.SMB311 -> "SMB 3.1.1"
+            DialectVersion.SMB1 -> "SMB 1"
+            null -> "SMB 2/3"
+        }
+        return if (compatibilityMode) "$version · 64KB 兼容模式" else "$version · 高速模式"
+    }
+
     private fun supportsRandomAccess(uri: Uri, fileSize: Long): Boolean {
         if (fileSize <= 1L) return false
         return runCatching {
@@ -413,13 +457,14 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
 
     private class UploadProgressReporter(
         private val totalBytes: Long,
-        private val onProgress: (Long, Long, Double) -> Unit,
+        private val protocol: String,
+        private val onProgress: (Long, Long, Double, String) -> Unit,
     ) {
         private val uploadedBytes = AtomicLong(0L)
         private val lastReportAt = AtomicLong(0L)
         private val startedAt = System.nanoTime()
 
-        fun start() = onProgress(0L, totalBytes, 0.0)
+        fun start() = onProgress(0L, totalBytes, 0.0, protocol)
 
         fun add(count: Int) {
             val uploaded = uploadedBytes.addAndGet(count.toLong())
@@ -437,7 +482,7 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
 
         private fun emit(uploaded: Long, now: Long) {
             val elapsedSeconds = (now - startedAt).coerceAtLeast(1L) / 1_000_000_000.0
-            onProgress(uploaded, totalBytes, uploaded / elapsedSeconds)
+            onProgress(uploaded, totalBytes, uploaded / elapsedSeconds, protocol)
         }
     }
 }

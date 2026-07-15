@@ -46,6 +46,7 @@ void main() {
       'uploadedBytes': 120,
       'totalBytes': 100,
       'bytesPerSecond': 73400320.0,
+      'protocol': 'SMB 3.1.1 · 高速模式',
     });
 
     expect(progress.fileIndex, 1);
@@ -53,6 +54,7 @@ void main() {
     expect(progress.fileName, 'sample.ts');
     expect(progress.progress, 1.0);
     expect(progress.bytesPerSecond, 73400320.0);
+    expect(progress.protocol, 'SMB 3.1.1 · 高速模式');
   });
 
   test('requests a video thumbnail from the native media entry', () async {

@@ -171,6 +171,17 @@ class _UploadProgressDialog extends StatelessWidget {
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: colors.onSurfaceVariant),
                           ),
+                          const SizedBox(height: 3),
+                          Text(
+                            value?.protocol ?? '正在协商 SMB 版本…',
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: value == null
+                                      ? colors.onSurfaceVariant
+                                      : colors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
                         ],
                       ),
                     ),

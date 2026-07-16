@@ -47,7 +47,9 @@ class _SettingsViewState extends State<SettingsView> {
     final service = AppUpdateService();
     try {
       final current = _appVersion ?? await service.getCurrentVersion();
-      final release = await service.fetchLatestRelease();
+      final release = await service.fetchLatestRelease(
+        supportedAbis: current.supportedAbis,
+      );
       if (!mounted) return;
       if (release.isNewerThan(current)) {
         await showDialog<void>(

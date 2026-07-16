@@ -32,7 +32,8 @@ storeFile=/absolute/path/to/release.jks
 1. 更新 `pubspec.yaml` 中的 `version: x.y.z+build`，并保证版本号高于已发布版本。
 2. 同步更新 `CHANGELOG.md`，提交并推送所有改动，确认 CI 通过。
 3. 创建并推送匹配的标签，例如 `git tag v1.2.0 && git push origin v1.2.0`。
-4. `release.yml` 会验证标签、运行测试、使用正式密钥构建 APK，并在本仓库创建 GitHub Release。
-5. 从 Release 安装 APK，确认“设置 > 检查更新”能读到发布版本。
+4. `release.yml` 会验证标签、运行测试，并使用正式密钥分别构建 `arm64-v8a`、`armeabi-v7a`、`x86_64` 三个 APK。
+5. 工作流在本仓库创建 GitHub Release，并按 ARM64、ARMv7、x86_64 的顺序上传三个 APK。App 会根据设备 ABI 自动选择对应文件；无法匹配时打开 Release 页面，不会直接下载错误架构。
+6. 从 Release 安装与设备匹配的 APK，确认“设置 > 检查更新”能读到发布版本。
 
 不要删除、替换或重新生成签名密钥。不要在源码、日志、Artifact 或 Release 中上传 `key.properties`、JKS 文件或其他凭据。

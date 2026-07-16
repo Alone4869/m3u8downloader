@@ -23,10 +23,10 @@ flutter test
 flutter build apk --debug
 ```
 
-正式构建前请阅读 [发布指南](docs/RELEASING.md)。App 默认从本仓库的公开 GitHub Releases 检查更新；复用代码时也可以在构建阶段覆盖更新源：
+正式构建前请阅读 [发布指南](docs/RELEASING.md)。正式 Release 会分别提供 `arm64-v8a`、`armeabi-v7a`、`x86_64` 三个 APK，App 检查更新时会自动选择设备支持的架构。复用代码时也可以在构建阶段覆盖更新源：
 
 ```bash
-flutter build apk --release \
+flutter build apk --release --split-per-abi \
   --dart-define=UPDATE_REPOSITORY=other-owner/other-repository
 ```
 

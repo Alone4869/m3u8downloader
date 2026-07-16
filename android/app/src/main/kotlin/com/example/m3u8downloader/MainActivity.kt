@@ -79,6 +79,7 @@ class MainActivity : FlutterActivity() {
                         mapOf(
                             "versionName" to info.versionName.orEmpty(),
                             "versionCode" to versionCode,
+                            "supportedAbis" to Build.SUPPORTED_ABIS.toList(),
                         ),
                     )
                 }

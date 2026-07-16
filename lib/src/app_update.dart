@@ -9,10 +9,15 @@ const updateRepository = String.fromEnvironment(
 );
 
 class AppVersion {
-  const AppVersion({required this.version, required this.buildNumber});
+  const AppVersion({
+    required this.version,
+    required this.buildNumber,
+    this.supportedAbis = const [],
+  });
 
   final String version;
   final int buildNumber;
+  final List<String> supportedAbis;
 
   String get display => '$version ($buildNumber)';
 }
@@ -54,13 +59,20 @@ class AppUpdateService {
 
   Future<AppVersion> getCurrentVersion() async {
     final value = await _methods.invokeMapMethod<String, Object?>('getAppInfo');
+    final supportedAbis =
+        (value?['supportedAbis'] as List<Object?>? ?? const [])
+            .whereType<String>()
+            .toList(growable: false);
     return AppVersion(
       version: value?['versionName'] as String? ?? '0.0.0',
       buildNumber: value?['versionCode'] as int? ?? 0,
+      supportedAbis: supportedAbis,
     );
   }
 
-  Future<AppRelease> fetchLatestRelease() async {
+  Future<AppRelease> fetchLatestRelease({
+    List<String> supportedAbis = const [],
+  }) async {
     if (updateRepository.trim().isEmpty) {
       throw const UpdateNotConfiguredException();
     }
@@ -88,7 +100,10 @@ class AppUpdateService {
         uri: uri,
       );
     }
-    return parseGitHubRelease(jsonDecode(body) as Map<String, Object?>);
+    return parseGitHubRelease(
+      jsonDecode(body) as Map<String, Object?>,
+      supportedAbis: supportedAbis,
+    );
   }
 
   Future<void> openRelease(AppRelease release) => _methods.invokeMethod<void>(
@@ -99,7 +114,10 @@ class AppUpdateService {
   void close() => _createdClient?.close(force: true);
 }
 
-AppRelease parseGitHubRelease(Map<String, Object?> json) {
+AppRelease parseGitHubRelease(
+  Map<String, Object?> json, {
+  List<String> supportedAbis = const [],
+}) {
   final tag = (json['tag_name'] as String? ?? '').trim();
   final pageUrl = Uri.tryParse(json['html_url'] as String? ?? '');
   if (!RegExp(r'^[vV]?\d+(?:\.\d+){1,2}(?:[-+].*)?$').hasMatch(tag) ||
@@ -108,7 +126,7 @@ AppRelease parseGitHubRelease(Map<String, Object?> json) {
     throw const FormatException('GitHub Release 缺少版本号或页面地址');
   }
 
-  Uri? apkUrl;
+  final apkAssets = <({String name, Uri url})>[];
   final assets = json['assets'];
   if (assets is List) {
     for (final asset in assets.whereType<Map>()) {
@@ -117,10 +135,27 @@ AppRelease parseGitHubRelease(Map<String, Object?> json) {
         asset['browser_download_url'] as String? ?? '',
       );
       if (name.endsWith('.apk') && candidate?.hasScheme == true) {
-        apkUrl = candidate;
+        apkAssets.add((name: name, url: candidate!));
+      }
+    }
+  }
+
+  Uri? apkUrl;
+  for (final abi in supportedAbis.map((value) => value.toLowerCase())) {
+    for (final asset in apkAssets) {
+      if (_assetMatchesAbi(asset.name, abi)) {
+        apkUrl = asset.url;
         break;
       }
     }
+    if (apkUrl != null) break;
+  }
+  apkUrl ??= apkAssets
+      .where((asset) => asset.name.contains('universal'))
+      .firstOrNull
+      ?.url;
+  if (apkUrl == null && apkAssets.length == 1) {
+    apkUrl = apkAssets.single.url;
   }
 
   return AppRelease(
@@ -132,6 +167,12 @@ AppRelease parseGitHubRelease(Map<String, Object?> json) {
     pageUrl: pageUrl,
     downloadUrl: apkUrl,
   );
+}
+
+bool _assetMatchesAbi(String assetName, String abi) {
+  if (abi.isEmpty) return false;
+  final escapedAbi = RegExp.escape(abi);
+  return RegExp('(?:^|[-_.])$escapedAbi(?:[-_.]|\\.apk\$)').hasMatch(assetName);
 }
 
 int compareVersions(String left, String right) {

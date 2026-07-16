@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Versions follow Semantic Versioning; the `+N` suffix in `pubspec.yaml` is the monotonically increasing Android build number.
 
+## 1.2.1 - 2026-07-16
+
+- Publish separate signed APKs for `arm64-v8a`, `armeabi-v7a`, and `x86_64`.
+- Select the matching APK automatically during in-app update checks.
+- Fall back to the GitHub Release page instead of downloading an incompatible APK when the device ABI cannot be matched.
+
 ## 1.2.0 - 2026-07-16
 
 - Add GitHub Releases update checks and dynamic version information in Settings.

@@ -311,48 +311,24 @@ class _HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: colors.primary,
-            borderRadius: BorderRadius.circular(17),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            '𝕏',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 29,
-              fontWeight: FontWeight.w700,
-            ),
+    return Center(
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: colors.primary,
+          borderRadius: BorderRadius.circular(17),
+        ),
+        alignment: Alignment.center,
+        child: const Text(
+          '𝕏',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 29,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'X 视频下载',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '粘贴推文链接，选择需要的画质',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

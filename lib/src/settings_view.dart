@@ -150,115 +150,120 @@ class _SettingsViewState extends State<SettingsView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('设置')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-        children: [
-          const _SettingsHero(),
-          const _SettingsHeader('通用设置'),
-          _SettingsCard(
-            children: [
-              const ListTile(
-                leading: _SettingsIcon(Icons.folder_outlined),
-                title: Text('下载位置'),
-                subtitle: Text('下载/M3U8 Downloader'),
-              ),
-              const Divider(indent: 64),
-              ListTile(
-                leading: const _SettingsIcon(Icons.route_rounded),
-                title: const Text('X 视频下载线路'),
-                subtitle: Text(
-                  '${_downloadRoute.title} · ${_downloadRoute.description}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            const _SettingsHero(),
+            const _SettingsHeader('通用设置'),
+            _SettingsCard(
+              children: [
+                const ListTile(
+                  leading: _SettingsIcon(Icons.folder_outlined),
+                  title: Text('下载位置'),
+                  subtitle: Text('下载/M3U8 Downloader'),
                 ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: _editDownloadRoute,
-              ),
-              const Divider(indent: 64),
-              const ListTile(
-                leading: _SettingsIcon(Icons.bolt_outlined),
-                title: Text('高速下载'),
-                subtitle: Text('每个任务最多 6 路连接'),
-              ),
-              const Divider(indent: 64),
-              const ListTile(
-                leading: _SettingsIcon(Icons.shield_outlined),
-                title: Text('数据保护'),
-                subtitle: Text('升级请直接覆盖安装；任务记录与非敏感设置跟随系统备份'),
-              ),
-            ],
-          ),
-          const _SettingsHeader('上传设置'),
-          _SettingsCard(
-            children: [
-              ListTile(
-                leading: const _SettingsIcon(Icons.dns_outlined),
-                title: const Text('SMB 服务器'),
-                subtitle: Text(
-                  _smbConfig?.isConfigured == true
-                      ? '${_smbConfig!.host}/${_smbConfig!.share}'
-                      : '尚未配置远端存储',
+                const Divider(indent: 64),
+                ListTile(
+                  leading: const _SettingsIcon(Icons.route_rounded),
+                  title: const Text('X 视频下载线路'),
+                  subtitle: Text(
+                    '${_downloadRoute.title} · ${_downloadRoute.description}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _editDownloadRoute,
                 ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  await Navigator.push<void>(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SmbSettingsPage()),
-                  );
-                  _reload();
-                },
-              ),
-              const Divider(indent: 64),
-              const ListTile(
-                leading: _SettingsIcon(Icons.speed_rounded),
-                title: Text('上传引擎'),
-                subtitle: Text('SMB 2/3 · 自适应窗口 · 多连接上传'),
-              ),
-            ],
-          ),
-          const _SettingsHeader('关于'),
-          _SettingsCard(
-            children: [
-              ListTile(
-                leading: const _SettingsIcon(Icons.system_update_outlined),
-                title: const Text('检查更新'),
-                subtitle: Text(
-                  _appVersion == null
-                      ? '正在读取版本…'
-                      : '当前版本 ${_appVersion!.display}',
+                const Divider(indent: 64),
+                const ListTile(
+                  leading: _SettingsIcon(Icons.bolt_outlined),
+                  title: Text('高速下载'),
+                  subtitle: Text('每个任务最多 6 路连接'),
                 ),
-                trailing: _checkingUpdate
-                    ? const SizedBox.square(
-                        dimension: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.chevron_right_rounded),
-                onTap: _checkingUpdate ? null : _checkForUpdates,
-              ),
-              const Divider(indent: 64),
-              const ListTile(
-                leading: _SettingsIcon(Icons.verified_user_outlined),
-                title: Text('内容与隐私'),
-                subtitle: Text('请仅处理你有权下载和上传的内容'),
-              ),
-              const Divider(indent: 64),
-              ListTile(
-                leading: const _SettingsIcon(Icons.code_rounded),
-                title: const Text('开源许可'),
-                subtitle: const Text('查看本项目及第三方软件许可'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => showLicensePage(
-                  context: context,
-                  applicationName: 'M3U8 视频下载器',
-                  applicationVersion: _appVersion?.display,
-                  applicationLegalese: 'Copyright 2026 Alone4869 · MIT License',
+                const Divider(indent: 64),
+                const ListTile(
+                  leading: _SettingsIcon(Icons.shield_outlined),
+                  title: Text('数据保护'),
+                  subtitle: Text('升级请直接覆盖安装；任务记录与非敏感设置跟随系统备份'),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 96),
-        ],
+              ],
+            ),
+            const _SettingsHeader('上传设置'),
+            _SettingsCard(
+              children: [
+                ListTile(
+                  leading: const _SettingsIcon(Icons.dns_outlined),
+                  title: const Text('SMB 服务器'),
+                  subtitle: Text(
+                    _smbConfig?.isConfigured == true
+                        ? '${_smbConfig!.host}/${_smbConfig!.share}'
+                        : '尚未配置远端存储',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SmbSettingsPage(),
+                      ),
+                    );
+                    _reload();
+                  },
+                ),
+                const Divider(indent: 64),
+                const ListTile(
+                  leading: _SettingsIcon(Icons.speed_rounded),
+                  title: Text('上传引擎'),
+                  subtitle: Text('SMB 2/3 · 自适应窗口 · 多连接上传'),
+                ),
+              ],
+            ),
+            const _SettingsHeader('关于'),
+            _SettingsCard(
+              children: [
+                ListTile(
+                  leading: const _SettingsIcon(Icons.system_update_outlined),
+                  title: const Text('检查更新'),
+                  subtitle: Text(
+                    _appVersion == null
+                        ? '正在读取版本…'
+                        : '当前版本 ${_appVersion!.display}',
+                  ),
+                  trailing: _checkingUpdate
+                      ? const SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: _checkingUpdate ? null : _checkForUpdates,
+                ),
+                const Divider(indent: 64),
+                const ListTile(
+                  leading: _SettingsIcon(Icons.verified_user_outlined),
+                  title: Text('内容与隐私'),
+                  subtitle: Text('请仅处理你有权下载和上传的内容'),
+                ),
+                const Divider(indent: 64),
+                ListTile(
+                  leading: const _SettingsIcon(Icons.code_rounded),
+                  title: const Text('开源许可'),
+                  subtitle: const Text('查看本项目及第三方软件许可'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => showLicensePage(
+                    context: context,
+                    applicationName: 'M3U8 视频下载器',
+                    applicationVersion: _appVersion?.display,
+                    applicationLegalese:
+                        'Copyright 2026 Alone4869 · MIT License',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 96),
+          ],
+        ),
       ),
     );
   }

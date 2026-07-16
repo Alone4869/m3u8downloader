@@ -53,7 +53,7 @@ void main() {
                 header: SizedBox(
                   key: headerKey,
                   height: 110,
-                  child: Text('传输中心'),
+                  child: Text('下载'),
                 ),
                 body: SizedBox(
                   key: bodyKey,
@@ -71,7 +71,7 @@ void main() {
       ),
     );
 
-    expect(find.text('传输中心'), findsOneWidget);
+    expect(find.text('下载'), findsOneWidget);
     expect(find.text('没有正在下载的任务'), findsOneWidget);
     expect(find.text('批量操作'), findsOneWidget);
     expect(tester.getTopLeft(find.byKey(headerKey)).dy, 0);

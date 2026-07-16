@@ -1232,22 +1232,24 @@ class DownloadsHeader extends StatelessWidget {
         children: [
           SizedBox(
             height: 48,
-            child: Row(
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Expanded(
-                  child: Text(
-                    '传输中心',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: colors.onSurface,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                    ),
+                Text(
+                  '下载',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: colors.onSurface,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: hasTasks && !editing ? onEdit : null,
-                  icon: const Icon(Icons.edit_outlined, size: 19),
-                  label: const Text('编辑'),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: hasTasks && !editing ? onEdit : null,
+                    icon: const Icon(Icons.edit_outlined, size: 19),
+                    label: const Text('编辑'),
+                  ),
                 ),
               ],
             ),

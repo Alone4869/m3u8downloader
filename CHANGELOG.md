@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here. Versions follow Semantic Versioning; the `+N` suffix in `pubspec.yaml` is the monotonically increasing Android build number.
 
+## 1.2.8 - 2026-07-16
+
+- Simplify and center the top headers across the home, downloads, and settings pages.
+
 ## 1.2.7 - 2026-07-16
 
 - Retry failed downloads in place so the original task changes back to queued and no duplicate task remains.

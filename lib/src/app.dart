@@ -13,6 +13,20 @@ import 'settings_view.dart';
 import 'smb_upload.dart';
 import 'twitter_home_view.dart';
 
+const double _bottomNavigationHeight = 68;
+const double _minimumBottomNavigationMargin = 10;
+
+double _bottomNavigationClearance(BuildContext context) {
+  // Scaffold injects the reserved navigation height into padding when
+  // extendBody is enabled. viewPadding remains the device's physical inset,
+  // so using it prevents descendants from counting the navigation twice.
+  final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+  final bottomMargin = bottomInset < _minimumBottomNavigationMargin
+      ? _minimumBottomNavigationMargin - bottomInset
+      : 0.0;
+  return bottomInset + bottomMargin + _bottomNavigationHeight;
+}
+
 class M3u8DownloaderApp extends StatelessWidget {
   const M3u8DownloaderApp({super.key});
 
@@ -226,6 +240,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SettingsView(),
                 ],
+              ),
+              // The glass navigation is painted by LiquidGlassScaffold as an
+              // overlay. Reserve the same geometry here so ScaffoldMessenger
+              // keeps floating SnackBars above it while the page can still
+              // render behind the glass through extendBody.
+              bottomNavigationBar: SizedBox(
+                height: _bottomNavigationClearance(context),
               ),
             ),
           ),
@@ -1145,7 +1166,7 @@ class DownloadsPageFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final navigationInset = MediaQuery.paddingOf(context).bottom;
+    final navigationInset = _bottomNavigationClearance(context);
     return ColoredBox(
       color: Colors.transparent,
       child: SafeArea(
@@ -1312,10 +1333,10 @@ class _DownloadEditBar extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline),
               ),
               const SizedBox(width: 8),
-              FilledButton.icon(
+              IconButton.filledTonal(
+                tooltip: '上传 $selectedCount 个任务',
                 onPressed: selectedCount > 0 ? onUpload : null,
                 icon: const Icon(Icons.cloud_upload_outlined),
-                label: Text('上传 $selectedCount'),
               ),
             ],
           ),
@@ -1354,7 +1375,7 @@ class _DownloadSection extends StatelessWidget {
         14,
         8,
         14,
-        MediaQuery.paddingOf(context).bottom + 88,
+        _bottomNavigationClearance(context) + (editing ? 76 : 16),
       ),
       children: [
         ...tasks.map(

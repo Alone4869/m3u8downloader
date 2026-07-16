@@ -37,25 +37,33 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: Align(
-          alignment: Alignment.topLeft,
-          child: SizedBox(
-            width: 360,
-            height: 500,
-            child: DownloadsPageFrame(
-              header: SizedBox(
-                key: headerKey,
-                height: 110,
-                child: Text('传输中心'),
-              ),
-              body: SizedBox(
-                key: bodyKey,
-                child: Center(child: Text('没有正在下载的任务')),
-              ),
-              bottomBar: SizedBox(
-                key: actionsKey,
-                height: 64,
-                child: Text('批量操作'),
+        home: MediaQuery(
+          // Simulate Scaffold.extendBody: padding includes the reserved
+          // navigation height while viewPadding keeps the physical inset.
+          data: MediaQueryData(
+            padding: EdgeInsets.only(bottom: 92),
+            viewPadding: EdgeInsets.only(bottom: 24),
+          ),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 360,
+              height: 500,
+              child: DownloadsPageFrame(
+                header: SizedBox(
+                  key: headerKey,
+                  height: 110,
+                  child: Text('传输中心'),
+                ),
+                body: SizedBox(
+                  key: bodyKey,
+                  child: Center(child: Text('没有正在下载的任务')),
+                ),
+                bottomBar: SizedBox(
+                  key: actionsKey,
+                  height: 64,
+                  child: Text('批量操作'),
+                ),
               ),
             ),
           ),
@@ -68,6 +76,7 @@ void main() {
     expect(find.text('批量操作'), findsOneWidget);
     expect(tester.getTopLeft(find.byKey(headerKey)).dy, 0);
     expect(tester.getSize(find.byKey(bodyKey)).height, 390);
-    expect(tester.getTopLeft(find.byKey(actionsKey)).dy, 436);
+    // 24px system inset + 68px floating navigation are kept clear.
+    expect(tester.getTopLeft(find.byKey(actionsKey)).dy, 344);
   });
 }

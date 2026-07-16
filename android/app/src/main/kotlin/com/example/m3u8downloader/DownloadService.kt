@@ -47,7 +47,9 @@ class DownloadService : Service() {
                 val fileName = sanitizeFileName(intent.getStringExtra(EXTRA_FILE_NAME).orEmpty())
                 val cookie = intent.getStringExtra(EXTRA_COOKIE).orEmpty()
                 val sourceUrl = intent.getStringExtra(EXTRA_SOURCE_URL).orEmpty()
-                val id = "${System.currentTimeMillis()}-${url.hashCode().toUInt()}"
+                val requestedId = intent.getStringExtra(EXTRA_ID).orEmpty()
+                val id = requestedId.takeIf(::isValidTaskId)
+                    ?: "${System.currentTimeMillis()}-${url.hashCode().toUInt()}"
                 startForeground(
                     FOREGROUND_NOTIFICATION_ID,
                     buildNotification("准备下载", fileName, 0, true),
@@ -529,6 +531,10 @@ class DownloadService : Service() {
 
     private fun sanitizeFileName(input: String): String {
         return input.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "video.ts" }.take(180)
+    }
+
+    private fun isValidTaskId(value: String): Boolean {
+        return value.length in 1..180 && value.all { it.isLetterOrDigit() || it in "._-" }
     }
 
     private fun resolveUrl(base: String, child: String): String = URL(URL(base), child).toString()

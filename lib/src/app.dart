@@ -1789,6 +1789,7 @@ class _DownloadTile extends StatelessWidget {
         url: task.url,
         fileName: task.fileName,
         sourceUrl: task.sourceUrl,
+        taskId: task.id,
       );
       if (!context.mounted) return;
       ScaffoldMessenger.of(

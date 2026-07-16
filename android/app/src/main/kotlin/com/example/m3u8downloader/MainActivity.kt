@@ -43,6 +43,7 @@ class MainActivity : FlutterActivity() {
                     val fileName = call.argument<String>("fileName")?.trim().orEmpty()
                     val cookie = call.argument<String>("cookie").orEmpty()
                     val sourceUrl = call.argument<String>("sourceUrl")?.trim().orEmpty()
+                    val taskId = call.argument<String>("taskId")?.trim().orEmpty()
                     if (url.isBlank() || fileName.isBlank()) {
                         result.error("invalid_arguments", "下载链接和文件名不能为空", null)
                         return@setMethodCallHandler
@@ -54,6 +55,7 @@ class MainActivity : FlutterActivity() {
                         putExtra(DownloadService.EXTRA_FILE_NAME, fileName)
                         putExtra(DownloadService.EXTRA_COOKIE, cookie)
                         putExtra(DownloadService.EXTRA_SOURCE_URL, sourceUrl)
+                        putExtra(DownloadService.EXTRA_ID, taskId)
                     }
                     ContextCompat.startForegroundService(this, intent)
                     result.success(null)

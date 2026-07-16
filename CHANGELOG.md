@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here. Versions follow Semantic Versioning; the `+N` suffix in `pubspec.yaml` is the monotonically increasing Android build number.
 
+## 1.2.7 - 2026-07-16
+
+- Retry failed downloads in place so the original task changes back to queued and no duplicate task remains.
+
 ## 1.2.6 - 2026-07-16
 
 - Add a retry action to the long-press menu for failed downloads.

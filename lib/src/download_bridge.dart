@@ -143,12 +143,14 @@ class DownloadBridge {
     required String fileName,
     String cookie = '',
     String sourceUrl = '',
+    String taskId = '',
   }) {
     return _methods.invokeMethod('startDownload', {
       'url': url,
       'fileName': fileName,
       'cookie': cookie,
       'sourceUrl': sourceUrl,
+      'taskId': taskId,
     });
   }
 

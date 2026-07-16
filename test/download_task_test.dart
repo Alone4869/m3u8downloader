@@ -64,7 +64,32 @@ void main() {
       'fileName': 'video.mp4',
       'cookie': '',
       'sourceUrl': 'https://x.com/example/status/123',
+      'taskId': '',
     });
+  });
+
+  test('passes an existing task ID when retrying a failed download', () async {
+    const channel = MethodChannel('m3u8_downloader/methods');
+    MethodCall? capturedCall;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      capturedCall = call;
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await DownloadBridge.instance.startDownload(
+      url: 'https://cdn.example.com/video.mp4',
+      fileName: 'video.mp4',
+      sourceUrl: 'https://x.com/example/status/123',
+      taskId: '1720000000000-1234',
+    );
+
+    expect(
+      capturedCall?.arguments,
+      containsPair('taskId', '1720000000000-1234'),
+    );
   });
 
   test('parses SMB upload progress and clamps its fraction', () {

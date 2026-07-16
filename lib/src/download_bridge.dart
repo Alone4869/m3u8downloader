@@ -8,6 +8,7 @@ class DownloadTask {
   const DownloadTask({
     required this.id,
     required this.url,
+    this.sourceUrl = '',
     required this.fileName,
     required this.status,
     required this.progress,
@@ -25,6 +26,7 @@ class DownloadTask {
     return DownloadTask(
       id: map['id'] as String? ?? '',
       url: map['url'] as String? ?? '',
+      sourceUrl: map['sourceUrl'] as String? ?? '',
       fileName: map['fileName'] as String? ?? 'video.ts',
       status: DownloadStatus.values.firstWhere(
         (status) => status.name == statusName,
@@ -43,6 +45,7 @@ class DownloadTask {
 
   final String id;
   final String url;
+  final String sourceUrl;
   final String fileName;
   final DownloadStatus status;
   final double progress;
@@ -139,11 +142,13 @@ class DownloadBridge {
     required String url,
     required String fileName,
     String cookie = '',
+    String sourceUrl = '',
   }) {
     return _methods.invokeMethod('startDownload', {
       'url': url,
       'fileName': fileName,
       'cookie': cookie,
+      'sourceUrl': sourceUrl,
     });
   }
 

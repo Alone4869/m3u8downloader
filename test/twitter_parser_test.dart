@@ -59,6 +59,8 @@ void main() {
     expect(info.media, hasLength(1));
     expect(info.media.single.variants, hasLength(2));
     expect(info.media.single.variants.first.qualityLabel, '720p');
+    expect(info.media.single.variants.first.resolutionLabel, '728 × 720');
+    expect(info.media.single.variants.first.bitrateLabel, '2.18 Mbps');
     expect(info.media.single.variants.last.qualityLabel, '270p');
     expect(info.media.single.variants.first.bitrate, 2176000);
   });
@@ -83,5 +85,11 @@ void main() {
       }, directUrl: directUrl),
       relayUrl,
     );
+  });
+
+  test('reads the real file length from a partial response', () {
+    expect(TwitterParser.contentLengthFromRange('bytes 0-0/1404023'), 1404023);
+    expect(TwitterParser.contentLengthFromRange('bytes */*'), isNull);
+    expect(TwitterParser.contentLengthFromRange(null), isNull);
   });
 }

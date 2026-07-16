@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here. Versions follow Semantic Versioning; the `+N` suffix in `pubspec.yaml` is the monotonically increasing Android build number.
 
+## 1.2.6 - 2026-07-16
+
+- Add a retry action to the long-press menu for failed downloads.
+- Preserve and display the original source page URL alongside the resolved download URL.
+- Make task details more compact by removing the duplicated large file-name title.
+
+## 1.2.5 - 2026-07-16
+
+- Simplify X video quality rows so bitrate remains visible without repeating the quality level.
+- Use smaller secondary text for resolution and container details.
+
+## 1.2.4 - 2026-07-16
+
+- Remove bitrate-based file-size estimates from X video quality choices.
+- Probe the selected final download URL and show its actual file size in the confirmation dialog.
+
 ## 1.2.3 - 2026-07-16
 
 - Align the download edit actions directly above navigation and use matching icon buttons for delete and upload.

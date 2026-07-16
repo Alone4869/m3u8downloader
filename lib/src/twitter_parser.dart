@@ -25,22 +25,16 @@ class TwitterVideoVariant {
     return 'SD';
   }
 
-  String get detailsLabel {
-    final parts = <String>[];
-    if (width > 0 && height > 0) parts.add('$width × $height');
-    if (bitrate > 0) {
-      parts.add('${(bitrate / 1000000).toStringAsFixed(2)} Mbps');
-    }
-    return parts.join(' · ');
-  }
+  String get resolutionLabel =>
+      width > 0 && height > 0 ? '$width × $height' : '';
 
-  String estimatedSize(double durationSeconds) {
-    if (durationSeconds <= 0 || bitrate <= 0) return '';
-    final bytes = durationSeconds * bitrate / 8;
-    if (bytes >= 1024 * 1024) {
-      return '约 ${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
-    }
-    return '约 ${(bytes / 1024).toStringAsFixed(0)} KB';
+  String get bitrateLabel =>
+      bitrate > 0 ? '${(bitrate / 1000000).toStringAsFixed(2)} Mbps' : '';
+
+  String get detailsLabel {
+    final parts = [resolutionLabel, bitrateLabel]
+      ..removeWhere((part) => part.isEmpty);
+    return parts.join(' · ');
   }
 }
 
@@ -104,6 +98,37 @@ class TwitterParser {
     final match = _tweetPattern.firstMatch(input);
     if (match == null) return null;
     return 'https://x.com/i/status/${match.group(1)}';
+  }
+
+  Future<int?> probeContentLength(String url) async {
+    final request = await _client
+        .getUrl(Uri.parse(url))
+        .timeout(const Duration(seconds: 10));
+    request
+      ..persistentConnection = false
+      ..headers.set(HttpHeaders.rangeHeader, 'bytes=0-0')
+      ..headers.set(HttpHeaders.acceptHeader, '*/*')
+      ..headers.set(
+        HttpHeaders.userAgentHeader,
+        'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36',
+      );
+    final response = await request.close().timeout(const Duration(seconds: 15));
+    final contentRange = response.headers.value(HttpHeaders.contentRangeHeader);
+    final rangeLength = contentLengthFromRange(contentRange);
+    final contentLength = response.contentLength;
+    final statusCode = response.statusCode;
+    final subscription = response.listen((_) {});
+    await subscription.cancel();
+    if (statusCode == HttpStatus.partialContent) return rangeLength;
+    if (statusCode == HttpStatus.ok && contentLength > 0) return contentLength;
+    return null;
+  }
+
+  static int? contentLengthFromRange(String? contentRange) {
+    if (contentRange == null) return null;
+    final total = RegExp(r'/(\d+)$').firstMatch(contentRange)?.group(1);
+    final length = int.tryParse(total ?? '');
+    return length != null && length > 0 ? length : null;
   }
 
   Future<TwitterVideoInfo> parse(String input) async {

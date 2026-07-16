@@ -123,11 +123,12 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
 
   Future<void> _confirmDownload(
     TwitterVideoInfo info,
-    TwitterVideoMedia media,
     TwitterVideoVariant variant,
     int mediaIndex,
   ) async {
     final quality = variant.qualityLabel;
+    final resolved = await _resolveDownload(info, variant);
+    if (resolved == null || !mounted) return;
     final username = info.authorUsername.isEmpty
         ? 'twitter'
         : info.authorUsername;
@@ -155,9 +156,9 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _DownloadSummary(
-                  media: media,
                   variant: variant,
                   route: _downloadRoute,
+                  contentLength: resolved.contentLength,
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -189,12 +190,11 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
       var fileName = _safeFileName(controller.text.trim());
       if (fileName.isEmpty) fileName = 'twitter_${info.tweetId}-$quality.mp4';
       if (!fileName.toLowerCase().endsWith('.mp4')) fileName = '$fileName.mp4';
-      final downloadUrl = await _resolveDownloadUrl(info, variant);
-      if (downloadUrl == null) return;
       await DownloadBridge.instance.startDownload(
-        url: downloadUrl,
+        url: resolved.url,
         fileName: fileName,
         cookie: '',
+        sourceUrl: info.tweetUrl,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -210,12 +210,10 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
     }
   }
 
-  Future<String?> _resolveDownloadUrl(
+  Future<_ResolvedTwitterDownload?> _resolveDownload(
     TwitterVideoInfo info,
     TwitterVideoVariant variant,
   ) async {
-    if (_downloadRoute == TwitterDownloadRoute.direct) return variant.url;
-
     final dialogContext = Completer<BuildContext>();
     unawaited(
       showDialog<void>(
@@ -228,7 +226,7 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
               children: [
                 CircularProgressIndicator(),
                 SizedBox(width: 18),
-                Expanded(child: Text('正在获取 SnapCDN 中转链接…')),
+                Expanded(child: Text('正在获取下载信息…')),
               ],
             ),
           );
@@ -237,10 +235,20 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
     );
     final progressContext = await dialogContext.future;
     try {
-      return await _parser.resolveSnapCdnDownloadUrl(
-        tweetUrl: info.tweetUrl,
-        directUrl: variant.url,
-      );
+      final url = _downloadRoute == TwitterDownloadRoute.direct
+          ? variant.url
+          : await _parser.resolveSnapCdnDownloadUrl(
+              tweetUrl: info.tweetUrl,
+              directUrl: variant.url,
+            );
+      int? contentLength;
+      try {
+        contentLength = await _parser.probeContentLength(url);
+      } catch (_) {
+        // Some origins do not support a lightweight Range probe. The final
+        // download remains valid; the dialog will simply show an unknown size.
+      }
+      return _ResolvedTwitterDownload(url: url, contentLength: contentLength);
     } catch (error) {
       if (!mounted) return null;
       final message = error is TwitterParseException
@@ -537,7 +545,6 @@ class _GuideStep extends StatelessWidget {
 typedef _DownloadCallback =
     Future<void> Function(
       TwitterVideoInfo info,
-      TwitterVideoMedia media,
       TwitterVideoVariant variant,
       int mediaIndex,
     );
@@ -614,8 +621,7 @@ class _VideoResult extends StatelessWidget {
             media: info.media[index],
             index: index,
             count: info.media.length,
-            onDownload: (variant) =>
-                onDownload(info, info.media[index], variant, index),
+            onDownload: (variant) => onDownload(info, variant, index),
           ),
           if (index != info.media.length - 1) const SizedBox(height: 14),
         ],
@@ -712,19 +718,23 @@ class _MediaCard extends StatelessWidget {
                     ),
                   ),
                   title: Text(
-                    variant.detailsLabel.isEmpty
+                    variant.bitrateLabel.isEmpty
                         ? 'MP4 视频'
-                        : variant.detailsLabel,
+                        : variant.bitrateLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   subtitle: Text(
-                    variant.estimatedSize(media.durationSeconds).isEmpty
-                        ? '点击确认并下载'
-                        : '${variant.estimatedSize(media.durationSeconds)} · MP4',
+                    variant.resolutionLabel.isEmpty
+                        ? 'MP4'
+                        : '${variant.resolutionLabel} · MP4',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: const Icon(Icons.download_rounded),
                   onTap: () => onDownload(variant),
@@ -760,18 +770,17 @@ class _NetworkAvatar extends StatelessWidget {
 
 class _DownloadSummary extends StatelessWidget {
   const _DownloadSummary({
-    required this.media,
     required this.variant,
     required this.route,
+    required this.contentLength,
   });
 
-  final TwitterVideoMedia media;
   final TwitterVideoVariant variant;
   final TwitterDownloadRoute route;
+  final int? contentLength;
 
   @override
   Widget build(BuildContext context) {
-    final estimated = variant.estimatedSize(media.durationSeconds);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -796,9 +805,9 @@ class _DownloadSummary extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 Text(
-                  estimated.isEmpty
-                      ? route.title
-                      : '${route.title} · $estimated · 实际大小以服务器为准',
+                  contentLength == null
+                      ? '${route.title} · 实际大小未知'
+                      : '${route.title} · 实际大小 ${_formatFileSize(contentLength!)}',
                 ),
               ],
             ),
@@ -807,4 +816,23 @@ class _DownloadSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ResolvedTwitterDownload {
+  const _ResolvedTwitterDownload({
+    required this.url,
+    required this.contentLength,
+  });
+
+  final String url;
+  final int? contentLength;
+}
+
+String _formatFileSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  final kilobytes = bytes / 1024;
+  if (kilobytes < 1024) return '${kilobytes.toStringAsFixed(1)} KB';
+  final megabytes = kilobytes / 1024;
+  if (megabytes < 1024) return '${megabytes.toStringAsFixed(2)} MB';
+  return '${(megabytes / 1024).toStringAsFixed(2)} GB';
 }

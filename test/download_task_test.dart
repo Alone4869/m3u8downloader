@@ -9,6 +9,7 @@ void main() {
     final task = DownloadTask.fromMap({
       'id': 'task-1',
       'url': 'https://example.com/master.m3u8',
+      'sourceUrl': 'https://x.com/example/status/123',
       'fileName': 'sample.ts',
       'status': 'downloading',
       'progress': 0.42,
@@ -22,6 +23,7 @@ void main() {
     });
 
     expect(task.id, 'task-1');
+    expect(task.sourceUrl, 'https://x.com/example/status/123');
     expect(task.status, DownloadStatus.downloading);
     expect(task.progress, 0.42);
     expect(task.createdAt, 1000);
@@ -36,6 +38,33 @@ void main() {
 
     expect(task.status, DownloadStatus.queued);
     expect(task.fileName, 'video.ts');
+    expect(task.sourceUrl, isEmpty);
+  });
+
+  test('passes the original source URL when starting a download', () async {
+    const channel = MethodChannel('m3u8_downloader/methods');
+    MethodCall? capturedCall;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      capturedCall = call;
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    await DownloadBridge.instance.startDownload(
+      url: 'https://cdn.example.com/video.mp4',
+      fileName: 'video.mp4',
+      sourceUrl: 'https://x.com/example/status/123',
+    );
+
+    expect(capturedCall?.method, 'startDownload');
+    expect(capturedCall?.arguments, {
+      'url': 'https://cdn.example.com/video.mp4',
+      'fileName': 'video.mp4',
+      'cookie': '',
+      'sourceUrl': 'https://x.com/example/status/123',
+    });
   });
 
   test('parses SMB upload progress and clamps its fraction', () {

@@ -629,6 +629,13 @@ class _BrowserViewState extends State<BrowserView> {
     }
     _handledUrls.add(rawUrl);
     _dialogOpen = true;
+    var sourceUrl = _addressController.text.trim();
+    try {
+      sourceUrl = (await _webViewController?.getUrl())?.toString() ?? sourceUrl;
+    } catch (_) {
+      // The visible address remains a useful source-page fallback if the
+      // WebView is being disposed while a media request is captured.
+    }
     final uri = Uri.tryParse(rawUrl);
     final suggestedName = _suggestFileName(uri, pageTitle);
     final fileNameController = TextEditingController(text: suggestedName);
@@ -696,6 +703,7 @@ class _BrowserViewState extends State<BrowserView> {
         url: rawUrl,
         fileName: fileName,
         cookie: cookieHeader,
+        sourceUrl: sourceUrl,
       );
       if (mounted) {
         ScaffoldMessenger.of(
@@ -1665,9 +1673,38 @@ class _DownloadTile extends StatelessWidget {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(task.fileName),
-        content: SelectableText(
-          '标题：${task.fileName}\n\n链接：${task.url}\n\n文件大小：${_formatFileSize(task.fileSize)}\n\n保存位置：${task.savedPath.isEmpty ? '尚未完成' : task.savedPath}\n\n上传状态：${task.uploaded ? '已上传' : '未上传'}',
+        title: const Text('任务详情'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TaskDetailRow(label: '文件名', value: task.fileName),
+                _TaskDetailRow(label: '状态', value: _detailStatusText(task)),
+                _TaskDetailRow(
+                  label: '文件大小',
+                  value: _formatFileSize(task.fileSize),
+                ),
+                _TaskDetailRow(
+                  label: '保存位置',
+                  value: task.savedPath.isEmpty ? '尚未完成' : task.savedPath,
+                ),
+                _TaskLinkRow(
+                  label: '原始链接',
+                  value: task.sourceUrl,
+                  emptyText: '未记录（旧任务）',
+                ),
+                _TaskLinkRow(label: '下载链接', value: task.url),
+                _TaskDetailRow(
+                  label: '上传状态',
+                  value: task.uploaded ? '已上传' : '未上传',
+                  isLast: true,
+                ),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -1719,6 +1756,15 @@ class _DownloadTile extends StatelessWidget {
                   DownloadBridge.instance.cancelDownload(task.id);
                 },
               ),
+            if (task.status == DownloadStatus.failed)
+              ListTile(
+                leading: const Icon(Icons.refresh_rounded),
+                title: const Text('重新下载'),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await _retryDownload(context);
+                },
+              ),
             const SizedBox(height: 8),
           ],
         ),
@@ -1737,6 +1783,34 @@ class _DownloadTile extends StatelessWidget {
     }
   }
 
+  Future<void> _retryDownload(BuildContext context) async {
+    try {
+      await DownloadBridge.instance.startDownload(
+        url: task.url,
+        fileName: task.fileName,
+        sourceUrl: task.sourceUrl,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已重新加入下载：${task.fileName}')));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('重新下载失败：$error')));
+    }
+  }
+
+  String _detailStatusText(DownloadTask task) => switch (task.status) {
+    DownloadStatus.queued => '等待下载',
+    DownloadStatus.downloading => '下载中 ${(task.progress * 100).round()}%',
+    DownloadStatus.completed => '下载完成',
+    DownloadStatus.failed =>
+      task.message.isEmpty ? '下载失败' : '下载失败：${task.message}',
+    DownloadStatus.cancelled => '已取消',
+  };
+
   Color _statusColor(BuildContext context, DownloadStatus status) =>
       switch (status) {
         DownloadStatus.queued => Theme.of(context).colorScheme.secondary,
@@ -1754,6 +1828,108 @@ class _DownloadTile extends StatelessWidget {
     DownloadStatus.failed => '下载失败：${task.message}',
     DownloadStatus.cancelled => '已取消',
   };
+}
+
+class _TaskDetailRow extends StatelessWidget {
+  const _TaskDetailRow({
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskLinkRow extends StatelessWidget {
+  const _TaskLinkRow({
+    required this.label,
+    required this.value,
+    this.emptyText = '未记录',
+  });
+
+  final String label;
+  final String value;
+  final String emptyText;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = value.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              hasValue ? value : emptyText,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: hasValue
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          if (hasValue)
+            IconButton(
+              tooltip: '复制$linkLabel',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 30),
+              padding: EdgeInsets.zero,
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: value));
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('已复制$linkLabel')));
+              },
+              icon: const Icon(Icons.copy_rounded, size: 18),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String get linkLabel => label;
 }
 
 class _VideoFileIcon extends StatelessWidget {

@@ -50,6 +50,7 @@ object TaskStore {
                         task.put("contentUri", localFile.uri.toString())
                     }
                     if (!task.has("contentUri")) task.put("contentUri", "")
+                    if (!task.has("sourceUrl")) task.put("sourceUrl", "")
                     if (!task.has("uploaded")) task.put("uploaded", false)
                     add(jsonToMap(task.toString()))
                 }

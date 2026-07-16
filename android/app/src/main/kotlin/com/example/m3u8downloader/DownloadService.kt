@@ -46,6 +46,7 @@ class DownloadService : Service() {
                 val url = intent.getStringExtra(EXTRA_URL).orEmpty()
                 val fileName = sanitizeFileName(intent.getStringExtra(EXTRA_FILE_NAME).orEmpty())
                 val cookie = intent.getStringExtra(EXTRA_COOKIE).orEmpty()
+                val sourceUrl = intent.getStringExtra(EXTRA_SOURCE_URL).orEmpty()
                 val id = "${System.currentTimeMillis()}-${url.hashCode().toUInt()}"
                 startForeground(
                     FOREGROUND_NOTIFICATION_ID,
@@ -54,8 +55,8 @@ class DownloadService : Service() {
                 activeTasks.incrementAndGet()
                 val cancelled = AtomicBoolean(false)
                 cancellationFlags[id] = cancelled
-                emitTask(id, url, fileName, "queued", 0.0, "", "")
-                taskExecutor.execute { runDownload(id, url, fileName, cookie, cancelled) }
+                emitTask(id, url, sourceUrl, fileName, "queued", 0.0, "", "")
+                taskExecutor.execute { runDownload(id, url, sourceUrl, fileName, cookie, cancelled) }
             }
 
             ACTION_CANCEL -> intent.getStringExtra(EXTRA_ID)?.let { id ->
@@ -77,13 +78,14 @@ class DownloadService : Service() {
     private fun runDownload(
         id: String,
         url: String,
+        sourceUrl: String,
         fileName: String,
         cookie: String,
         cancelled: AtomicBoolean,
     ) {
         val taskDir = File(cacheDir, "downloads/$id").apply { mkdirs() }
         val output = File(taskDir, "result.part")
-        val progress = ProgressReporter(id, url, fileName)
+        val progress = ProgressReporter(id, url, sourceUrl, fileName)
         try {
             progress.update(0.0)
             if (url.lowercase(Locale.US).contains(".m3u8")) {
@@ -96,6 +98,7 @@ class DownloadService : Service() {
             emitTask(
                 id,
                 url,
+                sourceUrl,
                 fileName,
                 "completed",
                 1.0,
@@ -110,11 +113,11 @@ class DownloadService : Service() {
                 buildNotification("下载完成", fileName, 100, false),
             )
         } catch (_: DownloadCancelledException) {
-            emitTask(id, url, fileName, "cancelled", progress.value, "", "")
+            emitTask(id, url, sourceUrl, fileName, "cancelled", progress.value, "", "")
             notificationManager().cancel(id.hashCode())
         } catch (error: Exception) {
             val message = error.message?.take(180) ?: "未知错误"
-            emitTask(id, url, fileName, "failed", progress.value, message, "")
+            emitTask(id, url, sourceUrl, fileName, "failed", progress.value, message, "")
             notificationManager().notify(
                 id.hashCode(),
                 buildNotification("下载失败", "$fileName：$message", 0, false),
@@ -433,6 +436,7 @@ class DownloadService : Service() {
     private fun emitTask(
         id: String,
         url: String,
+        sourceUrl: String,
         fileName: String,
         status: String,
         progress: Double,
@@ -446,6 +450,7 @@ class DownloadService : Service() {
         val task = JSONObject().apply {
             put("id", id)
             put("url", url)
+            put("sourceUrl", sourceUrl)
             put("fileName", fileName)
             put("status", status)
             put("progress", progress.coerceIn(0.0, 1.0))
@@ -467,6 +472,7 @@ class DownloadService : Service() {
     private inner class ProgressReporter(
         private val id: String,
         private val url: String,
+        private val sourceUrl: String,
         private val fileName: String,
     ) {
         var value: Double = 0.0
@@ -481,7 +487,7 @@ class DownloadService : Service() {
             if (percent == lastPercent || (now - lastReportAt < 500 && percent < 100)) return
             lastPercent = percent
             lastReportAt = now
-            emitTask(id, url, fileName, "downloading", value, "", "")
+            emitTask(id, url, sourceUrl, fileName, "downloading", value, "", "")
             notificationManager().notify(
                 FOREGROUND_NOTIFICATION_ID,
                 buildNotification("正在下载", fileName, percent, true),
@@ -556,6 +562,7 @@ class DownloadService : Service() {
         const val EXTRA_URL = "url"
         const val EXTRA_FILE_NAME = "fileName"
         const val EXTRA_COOKIE = "cookie"
+        const val EXTRA_SOURCE_URL = "sourceUrl"
         const val EXTRA_ID = "id"
         const val EXTRA_TASK = "task"
 

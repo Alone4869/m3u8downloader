@@ -137,6 +137,118 @@ class TwitterParser {
     }
   }
 
+  Future<String> resolveSnapCdnDownloadUrl({
+    required String tweetUrl,
+    required String directUrl,
+  }) async {
+    Object? firstError;
+    for (final provider in const [
+      (
+        endpoint: 'https://savetwitter.net/api/ajaxSearch',
+        referer: 'https://savetwitter.net/zh-cn3',
+      ),
+      (
+        endpoint: 'https://snapvid.net/api/ajaxSearch',
+        referer: 'https://snapvid.net/zh-cn1/twitter-downloader',
+      ),
+    ]) {
+      try {
+        final result = await _requestSnapCdnProvider(
+          endpoint: provider.endpoint,
+          referer: provider.referer,
+          tweetUrl: tweetUrl,
+        );
+        return parseSnapCdnResponse(result, directUrl: directUrl);
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    throw TwitterParseException(
+      firstError is TwitterParseException
+          ? firstError.message
+          : '暂时无法获取 SnapCDN 中转链接，请稍后重试',
+    );
+  }
+
+  Future<Map<String, dynamic>> _requestSnapCdnProvider({
+    required String endpoint,
+    required String referer,
+    required String tweetUrl,
+  }) async {
+    final request = await _client
+        .postUrl(Uri.parse(endpoint))
+        .timeout(const Duration(seconds: 12));
+    request.headers
+      ..set(
+        HttpHeaders.contentTypeHeader,
+        'application/x-www-form-urlencoded; charset=UTF-8',
+      )
+      ..set(HttpHeaders.acceptHeader, 'application/json')
+      ..set('X-Requested-With', 'XMLHttpRequest')
+      ..set(HttpHeaders.refererHeader, referer)
+      ..set(
+        HttpHeaders.userAgentHeader,
+        'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36',
+      );
+    request.write(
+      'q=${Uri.encodeQueryComponent(tweetUrl)}&lang=zh-cn&cftoken=',
+    );
+    final response = await request.close().timeout(const Duration(seconds: 25));
+    final body = await utf8.decoder.bind(response).join();
+    if (response.statusCode != HttpStatus.ok) {
+      throw TwitterParseException('中转服务响应异常 (${response.statusCode})，请稍后重试');
+    }
+    final decoded = jsonDecode(body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const TwitterParseException('中转服务返回了无法识别的数据');
+    }
+    return decoded;
+  }
+
+  static String parseSnapCdnResponse(
+    Map<String, dynamic> root, {
+    required String directUrl,
+  }) {
+    final html = root['data'];
+    if (root['status'] != 'ok' || html is! String) {
+      throw const TwitterParseException('SaveTwitter 暂时无法生成中转链接');
+    }
+    final links = RegExp(
+      r'href="(https://dl\.snapcdn\.app/get\?token=[^"]+)"',
+      caseSensitive: false,
+    ).allMatches(html);
+    final directUri = Uri.tryParse(directUrl);
+    for (final link in links) {
+      final relayUrl = link.group(1)!.replaceAll('&amp;', '&');
+      final token = Uri.tryParse(relayUrl)?.queryParameters['token'];
+      final source = _snapCdnSourceUrl(token);
+      if (source == null) continue;
+      if (source == directUrl) return relayUrl;
+      final sourceUri = Uri.tryParse(source);
+      if (sourceUri != null &&
+          directUri != null &&
+          sourceUri.replace(query: '').toString() ==
+              directUri.replace(query: '').toString()) {
+        return relayUrl;
+      }
+    }
+    throw const TwitterParseException('中转服务没有返回该画质的下载链接');
+  }
+
+  static String? _snapCdnSourceUrl(String? token) {
+    if (token == null) return null;
+    final parts = token.split('.');
+    if (parts.length < 2) return null;
+    try {
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      return payload is Map<String, dynamic> ? payload['url'] as String? : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> _getJson(Uri uri) async {
     final request = await _client
         .getUrl(uri)

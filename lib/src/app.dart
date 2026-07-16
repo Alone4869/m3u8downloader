@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart';
@@ -205,115 +206,254 @@ class _HomeScreenState extends State<HomeScreen> {
           statusBarBrightness: dark ? Brightness.dark : Brightness.light,
           systemStatusBarContrastEnforced: false,
         ),
-        child: AppBackdrop(
-          child: Scaffold(
-            extendBody: true,
-            backgroundColor: Colors.transparent,
-            body: FullScreenPageStack(
-              index: _selectedIndex,
-              children: [
-                const TwitterHomeView(),
-                DownloadsView(
-                  key: _downloadsKey,
-                  onCountChanged: (count) {
-                    if (mounted && count != _taskCount) {
-                      setState(() => _taskCount = count);
-                    }
-                  },
-                ),
-                const SettingsView(),
-              ],
-            ),
-            bottomNavigationBar: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-              child: _LiquidNavigationBar(
-                selectedIndex: _selectedIndex,
-                taskCount: _taskCount,
-                onChanged: _selectDestination,
+        child: LiquidGlassScaffold(
+          realTimeCapture: true,
+          body: AppBackdrop(
+            child: Scaffold(
+              extendBody: true,
+              backgroundColor: Colors.transparent,
+              body: FullScreenPageStack(
+                index: _selectedIndex,
+                children: [
+                  const TwitterHomeView(),
+                  DownloadsView(
+                    key: _downloadsKey,
+                    onCountChanged: (count) {
+                      if (mounted && count != _taskCount) {
+                        setState(() => _taskCount = count);
+                      }
+                    },
+                  ),
+                  const SettingsView(),
+                ],
               ),
             ),
           ),
+          bottomNavigationBar: _buildLiquidNavigationBar(context),
         ),
       ),
     );
   }
-}
 
-class _LiquidNavigationBar extends StatelessWidget {
-  const _LiquidNavigationBar({
-    required this.selectedIndex,
-    required this.taskCount,
-    required this.onChanged,
-  });
-
-  final int selectedIndex;
-  final int taskCount;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildLiquidNavigationBar(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-    final downloadLabel = taskCount > 0 ? '下载 $taskCount' : '下载';
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final bottomMargin = bottomInset < 10 ? 10 - bottomInset : 0.0;
+    final downloadLabel = _taskCount > 0 ? '下载 $_taskCount' : '下载';
 
-    return LayoutBuilder(
-      builder: (context, constraints) => LiquidGlassBottomNavBar(
-        width: constraints.maxWidth,
-        height: 68,
-        margin: EdgeInsets.zero,
-        itemPadding: 5,
-        selectedIndex: selectedIndex,
-        onChanged: onChanged,
-        items: [
-          const LiquidGlassTabBarItem(
-            icon: Icons.home_outlined,
-            selectedIcon: Icons.home_rounded,
-            label: '首页',
-          ),
-          LiquidGlassTabBarItem(
-            icon: Icons.download_outlined,
-            selectedIcon: Icons.download_rounded,
-            label: downloadLabel,
-          ),
-          const LiquidGlassTabBarItem(
-            icon: Icons.settings_outlined,
-            selectedIcon: Icons.settings_rounded,
-            label: '设置',
-          ),
-        ],
-        itemStyle: LiquidGlassNavItemStyle(
-          selectedColor: colors.primary,
-          unselectedColor: colors.onSurfaceVariant,
-          iconSize: 23,
-          labelFontSize: 11,
-          iconLabelGap: 3,
-          selectedFontWeight: FontWeight.w700,
+    final barStyle = LiquidGlassStyle(
+      shape: LiquidGlassShape.continuousRoundedRectangle(
+        cornerRadius: 28,
+        borderWidth: 0.8,
+        borderColor: Colors.white.withValues(alpha: dark ? 0.12 : 0.30),
+      ),
+      appearance: LiquidGlassAppearance(
+        color: dark ? const Color(0x30171A21) : const Color(0x24FFFFFF),
+        saturation: 1.04,
+        blur: const LiquidGlassBlur(sigmaX: 4, sigmaY: 4),
+      ),
+      refraction: const LiquidGlassRefraction(
+        distortion: 0.035,
+        distortionWidth: 20,
+        chromaticAberration: 0.0008,
+      ),
+    );
+    final pillStyle = LiquidGlassStyle(
+      shape: LiquidGlassShape.continuousRoundedRectangle(
+        cornerRadius: 24,
+        borderWidth: 0.7,
+        borderColor: Colors.white.withValues(alpha: dark ? 0.14 : 0.34),
+      ),
+      appearance: LiquidGlassAppearance(
+        color: colors.primary.withValues(alpha: dark ? 0.18 : 0.11),
+        blur: const LiquidGlassBlur(sigmaX: 1.5, sigmaY: 1.5),
+      ),
+      refraction: const LiquidGlassRefraction(
+        distortion: 0.055,
+        distortionWidth: 16,
+        magnification: 1.025,
+        chromaticAberration: 0.0012,
+      ),
+    );
+
+    return _SmoothLiquidNavigationBar(
+      width: MediaQuery.sizeOf(context).width - 28,
+      height: 68,
+      bottomMargin: bottomMargin,
+      itemPadding: 5,
+      selectedIndex: _selectedIndex,
+      onChanged: _selectDestination,
+      reduceMotion: reduceMotion,
+      items: [
+        const LiquidGlassTabBarItem(
+          icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
+          label: '首页',
         ),
-        pillStyle: LiquidGlassNavPillStyle(
-          mode: LiquidGlassPillMode.none,
-          animated: true,
-          animationDuration: const Duration(milliseconds: 280),
-          animationCurve: Curves.easeOutCubic,
-          color: colors.primary.withValues(alpha: dark ? 0.18 : 0.10),
+        LiquidGlassTabBarItem(
+          icon: Icons.download_outlined,
+          selectedIcon: Icons.download_rounded,
+          label: downloadLabel,
         ),
-        style: LiquidGlassStyle(
-          shape: LiquidGlassShape.continuousRoundedRectangle(
-            cornerRadius: 28,
-            borderWidth: 0.8,
-            borderColor: Colors.white.withValues(alpha: dark ? 0.12 : 0.30),
-          ),
-          appearance: LiquidGlassAppearance(
-            color: dark ? const Color(0x30171A21) : const Color(0x24FFFFFF),
-            saturation: 1.04,
-            blur: const LiquidGlassBlur(sigmaX: 4, sigmaY: 4),
-          ),
-          refraction: const LiquidGlassRefraction(
-            distortion: 0.035,
-            distortionWidth: 20,
-            chromaticAberration: 0.0008,
-          ),
+        const LiquidGlassTabBarItem(
+          icon: Icons.settings_outlined,
+          selectedIcon: Icons.settings_rounded,
+          label: '设置',
+        ),
+      ],
+      itemStyle: LiquidGlassNavItemStyle(
+        selectedColor: colors.primary,
+        unselectedColor: colors.onSurfaceVariant,
+        iconSize: 23,
+        labelFontSize: 11,
+        iconLabelGap: 3,
+        selectedFontWeight: FontWeight.w700,
+      ),
+      barStyle: barStyle,
+      pillStyle: pillStyle,
+    );
+  }
+}
+
+class _SmoothLiquidNavigationBar extends StatefulWidget {
+  const _SmoothLiquidNavigationBar({
+    required this.width,
+    required this.height,
+    required this.bottomMargin,
+    required this.itemPadding,
+    required this.selectedIndex,
+    required this.onChanged,
+    required this.reduceMotion,
+    required this.items,
+    required this.itemStyle,
+    required this.barStyle,
+    required this.pillStyle,
+  });
+
+  final double width;
+  final double height;
+  final double bottomMargin;
+  final double itemPadding;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+  final bool reduceMotion;
+  final List<LiquidGlassTabBarItem> items;
+  final LiquidGlassNavItemStyle itemStyle;
+  final LiquidGlassStyle barStyle;
+  final LiquidGlassStyle pillStyle;
+
+  @override
+  State<_SmoothLiquidNavigationBar> createState() =>
+      _SmoothLiquidNavigationBarState();
+}
+
+class _SmoothLiquidNavigationBarState extends State<_SmoothLiquidNavigationBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _position = AnimationController.unbounded(
+    vsync: this,
+    value: widget.selectedIndex.toDouble(),
+  );
+
+  static const _spring = SpringDescription(
+    mass: 1,
+    stiffness: 240,
+    damping: 25,
+  );
+
+  @override
+  void didUpdateWidget(covariant _SmoothLiquidNavigationBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.reduceMotion && !oldWidget.reduceMotion) {
+      _position
+        ..stop()
+        ..value = widget.selectedIndex.toDouble();
+      return;
+    }
+    if (widget.selectedIndex == oldWidget.selectedIndex) return;
+    final target = widget.selectedIndex.toDouble();
+    if (widget.reduceMotion) {
+      _position.value = target;
+      return;
+    }
+    _position.animateWith(
+      SpringSimulation(_spring, _position.value, target, _position.velocity),
+    );
+  }
+
+  @override
+  void dispose() {
+    _position.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: widget.bottomMargin),
+      child: SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: LiquidGlassBottomNavBar(
+                width: widget.width,
+                height: widget.height,
+                margin: EdgeInsets.zero,
+                itemPadding: widget.itemPadding,
+                selectedIndex: widget.selectedIndex,
+                onChanged: widget.onChanged,
+                items: widget.items,
+                itemStyle: widget.itemStyle,
+                pillStyle: const LiquidGlassNavPillStyle(
+                  mode: LiquidGlassPillMode.none,
+                  show: false,
+                ),
+                style: widget.barStyle,
+              ),
+            ),
+            AnimatedBuilder(
+              animation: _position,
+              builder: (context, _) {
+                final cellWidth =
+                    (widget.width - widget.itemPadding * 2) /
+                    widget.items.length;
+                final maxIndex = (widget.items.length - 1).toDouble();
+                final position = _position.value
+                    .clamp(-0.06, maxIndex + 0.06)
+                    .toDouble();
+                final velocity = widget.reduceMotion ? 0.0 : _position.velocity;
+                final stretch = (velocity.abs() * 2.8)
+                    .clamp(0.0, 18.0)
+                    .toDouble();
+                final squeeze = (stretch * 0.16).clamp(0.0, 3.0).toDouble();
+                final pillWidth = cellWidth + stretch;
+                final pillHeight =
+                    widget.height - widget.itemPadding * 2 - squeeze;
+                final directionalLead = velocity.sign * stretch * 0.16;
+                final left =
+                    widget.itemPadding +
+                    position * cellWidth -
+                    stretch / 2 +
+                    directionalLead;
+                final top = (widget.height - pillHeight) / 2;
+
+                return Positioned(
+                  left: left,
+                  top: top,
+                  width: pillWidth,
+                  height: pillHeight,
+                  child: IgnorePointer(
+                    child: LiquidGlassLens(style: widget.pillStyle),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -948,6 +1088,9 @@ class _DownloadsViewState extends State<DownloadsView>
         controller: _tabController,
         activeCount: activeTasks.length,
         completedCount: completedTasks.length,
+        editing: _editing,
+        hasTasks: _visibleTasks.isNotEmpty,
+        onEdit: () => setState(() => _editing = true),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -975,12 +1118,10 @@ class _DownloadsViewState extends State<DownloadsView>
             ),
       bottomBar: _DownloadEditBar(
         editing: _editing,
-        hasTasks: _visibleTasks.isNotEmpty,
         selectedCount: _selectedIds.length,
         allSelected:
             _visibleTasks.isNotEmpty &&
             _selectedIds.containsAll(_visibleTasks.map((task) => task.id)),
-        onEdit: () => setState(() => _editing = true),
         onCancel: _exitEditing,
         onSelectAll: _selectAll,
         onDelete: _deleteSelected,
@@ -1039,11 +1180,17 @@ class DownloadsHeader extends StatelessWidget {
     required this.controller,
     required this.activeCount,
     required this.completedCount,
+    required this.editing,
+    required this.hasTasks,
+    required this.onEdit,
   });
 
   final TabController controller;
   final int activeCount;
   final int completedCount;
+  final bool editing;
+  final bool hasTasks;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1068,11 +1215,10 @@ class DownloadsHeader extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
-                  '$activeCount 个进行中',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
+                TextButton.icon(
+                  onPressed: hasTasks && !editing ? onEdit : null,
+                  icon: const Icon(Icons.edit_outlined, size: 19),
+                  label: const Text('编辑'),
                 ),
               ],
             ),
@@ -1125,10 +1271,8 @@ class DownloadsHeader extends StatelessWidget {
 class _DownloadEditBar extends StatelessWidget {
   const _DownloadEditBar({
     required this.editing,
-    required this.hasTasks,
     required this.selectedCount,
     required this.allSelected,
-    required this.onEdit,
     required this.onCancel,
     required this.onSelectAll,
     required this.onDelete,
@@ -1136,10 +1280,8 @@ class _DownloadEditBar extends StatelessWidget {
   });
 
   final bool editing;
-  final bool hasTasks;
   final int selectedCount;
   final bool allSelected;
-  final VoidCallback onEdit;
   final VoidCallback onCancel;
   final VoidCallback onSelectAll;
   final VoidCallback onDelete;
@@ -1147,46 +1289,38 @@ class _DownloadEditBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!editing) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
-      child: editing
-          ? AppSurface(
-              borderRadius: 18,
-              elevated: true,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: SizedBox(
-                height: 48,
-                child: Row(
-                  children: [
-                    TextButton(onPressed: onCancel, child: const Text('取消')),
-                    TextButton(
-                      onPressed: hasTasks ? onSelectAll : null,
-                      child: Text(allSelected ? '取消全选' : '全选'),
-                    ),
-                    const Spacer(),
-                    IconButton.filledTonal(
-                      tooltip: '删除',
-                      onPressed: selectedCount > 0 ? onDelete : null,
-                      icon: const Icon(Icons.delete_outline),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: selectedCount > 0 ? onUpload : null,
-                      icon: const Icon(Icons.cloud_upload_outlined),
-                      label: Text('上传 $selectedCount'),
-                    ),
-                  ],
-                ),
+      child: AppSurface(
+        borderRadius: 18,
+        elevated: true,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: SizedBox(
+          height: 48,
+          child: Row(
+            children: [
+              TextButton(onPressed: onCancel, child: const Text('取消')),
+              TextButton(
+                onPressed: onSelectAll,
+                child: Text(allSelected ? '取消全选' : '全选'),
               ),
-            )
-          : Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.tonalIcon(
-                onPressed: hasTasks ? onEdit : null,
-                icon: const Icon(Icons.checklist_rounded),
-                label: const Text('管理任务'),
+              const Spacer(),
+              IconButton.filledTonal(
+                tooltip: '删除',
+                onPressed: selectedCount > 0 ? onDelete : null,
+                icon: const Icon(Icons.delete_outline),
               ),
-            ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: selectedCount > 0 ? onUpload : null,
+                icon: const Icon(Icons.cloud_upload_outlined),
+                label: Text('上传 $selectedCount'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -55,7 +55,7 @@ void main() {
               bottomBar: SizedBox(
                 key: actionsKey,
                 height: 64,
-                child: Text('管理任务'),
+                child: Text('批量操作'),
               ),
             ),
           ),
@@ -65,7 +65,7 @@ void main() {
 
     expect(find.text('传输中心'), findsOneWidget);
     expect(find.text('没有正在下载的任务'), findsOneWidget);
-    expect(find.text('管理任务'), findsOneWidget);
+    expect(find.text('批量操作'), findsOneWidget);
     expect(tester.getTopLeft(find.byKey(headerKey)).dy, 0);
     expect(tester.getSize(find.byKey(bodyKey)).height, 390);
     expect(tester.getTopLeft(find.byKey(actionsKey)).dy, 436);

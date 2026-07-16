@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u8downloader/src/twitter_parser.dart';
 
@@ -59,5 +61,27 @@ void main() {
     expect(info.media.single.variants.first.qualityLabel, '720p');
     expect(info.media.single.variants.last.qualityLabel, '270p');
     expect(info.media.single.variants.first.bitrate, 2176000);
+  });
+
+  test('matches a SnapCDN relay token to its original quality URL', () {
+    const directUrl =
+        'https://video.twimg.com/video/vid/avc1/1920x1080/video.mp4?tag=12';
+    final payload = base64Url
+        .encode(
+          utf8.encode(
+            jsonEncode({'url': directUrl, 'filename': 'video-1080p.mp4'}),
+          ),
+        )
+        .replaceAll('=', '');
+    final relayUrl =
+        'https://dl.snapcdn.app/get?token=header.$payload.signature';
+
+    expect(
+      TwitterParser.parseSnapCdnResponse({
+        'status': 'ok',
+        'data': '<a href="$relayUrl">下载 MP4 (1080p)</a>',
+      }, directUrl: directUrl),
+      relayUrl,
+    );
   });
 }

@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'download_bridge.dart';
 import 'glass_surface.dart';
+import 'twitter_download_settings.dart';
 import 'twitter_parser.dart';
 
 class TwitterHomeView extends StatefulWidget {
@@ -24,10 +24,31 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
   String? _lastParsedUrl;
   bool _loading = false;
   int _requestGeneration = 0;
+  TwitterDownloadRoute _downloadRoute =
+      TwitterDownloadSettingsStore.instance.route.value;
+
+  @override
+  void initState() {
+    super.initState();
+    TwitterDownloadSettingsStore.instance.route.addListener(
+      _onDownloadRouteChanged,
+    );
+    unawaited(TwitterDownloadSettingsStore.instance.load());
+  }
+
+  void _onDownloadRouteChanged() {
+    if (!mounted) return;
+    setState(() {
+      _downloadRoute = TwitterDownloadSettingsStore.instance.route.value;
+    });
+  }
 
   @override
   void dispose() {
     _autoParseTimer?.cancel();
+    TwitterDownloadSettingsStore.instance.route.removeListener(
+      _onDownloadRouteChanged,
+    );
     _parser.close();
     _urlController.dispose();
     _urlFocus.dispose();
@@ -51,22 +72,17 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
     );
   }
 
-  Future<void> _pasteAndParse() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = data?.text?.trim() ?? '';
-    final url = TwitterParser.extractTweetUrl(text);
-    if (!mounted) return;
-    if (url == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('剪贴板中没有 Twitter/X 推文链接')));
-      return;
-    }
+  void _clearInput() {
     _autoParseTimer?.cancel();
-    _urlController.text = url;
-    _urlController.selection = TextSelection.collapsed(offset: url.length);
-    _urlFocus.unfocus();
-    await _parse(url, true);
+    _requestGeneration++;
+    _urlController.clear();
+    _urlFocus.requestFocus();
+    setState(() {
+      _videoInfo = null;
+      _error = null;
+      _lastParsedUrl = null;
+      _loading = false;
+    });
   }
 
   Future<void> _parse([String? rawUrl, bool force = false]) async {
@@ -138,7 +154,11 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _DownloadSummary(media: media, variant: variant),
+                _DownloadSummary(
+                  media: media,
+                  variant: variant,
+                  route: _downloadRoute,
+                ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: controller,
@@ -169,8 +189,10 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
       var fileName = _safeFileName(controller.text.trim());
       if (fileName.isEmpty) fileName = 'twitter_${info.tweetId}-$quality.mp4';
       if (!fileName.toLowerCase().endsWith('.mp4')) fileName = '$fileName.mp4';
+      final downloadUrl = await _resolveDownloadUrl(info, variant);
+      if (downloadUrl == null) return;
       await DownloadBridge.instance.startDownload(
-        url: variant.url,
+        url: downloadUrl,
         fileName: fileName,
         cookie: '',
       );
@@ -185,6 +207,51 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
       ).showSnackBar(SnackBar(content: Text('无法启动下载：$error')));
     } finally {
       controller.dispose();
+    }
+  }
+
+  Future<String?> _resolveDownloadUrl(
+    TwitterVideoInfo info,
+    TwitterVideoVariant variant,
+  ) async {
+    if (_downloadRoute == TwitterDownloadRoute.direct) return variant.url;
+
+    final dialogContext = Completer<BuildContext>();
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          if (!dialogContext.isCompleted) dialogContext.complete(context);
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 18),
+                Expanded(child: Text('正在获取 SnapCDN 中转链接…')),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    final progressContext = await dialogContext.future;
+    try {
+      return await _parser.resolveSnapCdnDownloadUrl(
+        tweetUrl: info.tweetUrl,
+        directUrl: variant.url,
+      );
+    } catch (error) {
+      if (!mounted) return null;
+      final message = error is TwitterParseException
+          ? error.message
+          : '无法获取 SnapCDN 中转链接';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$message；可在设置中切回 X 官方直连')));
+      return null;
+    } finally {
+      if (progressContext.mounted) Navigator.pop(progressContext);
     }
   }
 
@@ -209,7 +276,7 @@ class _TwitterHomeViewState extends State<TwitterHomeView> {
               focusNode: _urlFocus,
               loading: _loading,
               onChanged: _onUrlChanged,
-              onPaste: _pasteAndParse,
+              onClear: _clearInput,
               onParse: () => _parse(null, true),
             ),
             const SizedBox(height: 18),
@@ -288,7 +355,7 @@ class _UrlInputCard extends StatelessWidget {
     required this.focusNode,
     required this.loading,
     required this.onChanged,
-    required this.onPaste,
+    required this.onClear,
     required this.onParse,
   });
 
@@ -296,7 +363,7 @@ class _UrlInputCard extends StatelessWidget {
   final FocusNode focusNode;
   final bool loading;
   final ValueChanged<String> onChanged;
-  final VoidCallback onPaste;
+  final VoidCallback onClear;
   final VoidCallback onParse;
 
   @override
@@ -323,9 +390,9 @@ class _UrlInputCard extends StatelessWidget {
               hintText: 'https://x.com/user/status/…',
               prefixIcon: const Icon(Icons.link_rounded),
               suffixIcon: IconButton(
-                tooltip: '粘贴并解析',
-                onPressed: loading ? null : onPaste,
-                icon: const Icon(Icons.content_paste_go_rounded),
+                tooltip: '清空',
+                onPressed: onClear,
+                icon: const Icon(Icons.clear_rounded),
               ),
             ),
           ),
@@ -692,10 +759,15 @@ class _NetworkAvatar extends StatelessWidget {
 }
 
 class _DownloadSummary extends StatelessWidget {
-  const _DownloadSummary({required this.media, required this.variant});
+  const _DownloadSummary({
+    required this.media,
+    required this.variant,
+    required this.route,
+  });
 
   final TwitterVideoMedia media;
   final TwitterVideoVariant variant;
+  final TwitterDownloadRoute route;
 
   @override
   Widget build(BuildContext context) {
@@ -723,7 +795,11 @@ class _DownloadSummary extends StatelessWidget {
                       : '${variant.qualityLabel} · ${variant.detailsLabel}',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
-                if (estimated.isNotEmpty) Text('$estimated · 实际大小以服务器为准'),
+                Text(
+                  estimated.isEmpty
+                      ? route.title
+                      : '${route.title} · $estimated · 实际大小以服务器为准',
+                ),
               ],
             ),
           ),

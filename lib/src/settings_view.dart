@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'download_bridge.dart';
 import 'glass_surface.dart';
 import 'smb_settings.dart';
+import 'twitter_download_settings.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -13,6 +14,7 @@ class SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<SettingsView> {
   SmbConfig? _smbConfig;
+  TwitterDownloadRoute _downloadRoute = TwitterDownloadRoute.direct;
 
   @override
   void initState() {
@@ -21,10 +23,62 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _reload() async {
-    final config = await SmbSettingsStore.instance.load();
+    final configFuture = SmbSettingsStore.instance.load();
+    final routeFuture = TwitterDownloadSettingsStore.instance.load();
+    final config = await configFuture;
+    final route = await routeFuture;
     if (mounted) {
-      setState(() => _smbConfig = config);
+      setState(() {
+        _smbConfig = config;
+        _downloadRoute = route;
+      });
     }
+  }
+
+  Future<void> _editDownloadRoute() async {
+    final selected = await showDialog<TwitterDownloadRoute>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.route_rounded),
+        title: const Text('X 视频下载线路'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final route in TwitterDownloadRoute.values)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  route == TwitterDownloadRoute.direct
+                      ? Icons.speed_rounded
+                      : Icons.cloud_download_outlined,
+                ),
+                title: Text(route.title),
+                subtitle: Text(route.description),
+                trailing: route == _downloadRoute
+                    ? Icon(
+                        Icons.check_circle_rounded,
+                        color: Theme.of(dialogContext).colorScheme.primary,
+                      )
+                    : const Icon(Icons.circle_outlined),
+                onTap: () => Navigator.pop(dialogContext, route),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+    if (selected == null || selected == _downloadRoute) return;
+    await TwitterDownloadSettingsStore.instance.save(selected);
+    if (!mounted) return;
+    setState(() => _downloadRoute = selected);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('下载线路已切换为${selected.title}')));
   }
 
   @override
@@ -43,6 +97,18 @@ class _SettingsViewState extends State<SettingsView> {
                 leading: _SettingsIcon(Icons.folder_outlined),
                 title: Text('下载位置'),
                 subtitle: Text('下载/M3U8 Downloader'),
+              ),
+              const Divider(indent: 64),
+              ListTile(
+                leading: const _SettingsIcon(Icons.route_rounded),
+                title: const Text('X 视频下载线路'),
+                subtitle: Text(
+                  '${_downloadRoute.title} · ${_downloadRoute.description}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _editDownloadRoute,
               ),
               const Divider(indent: 64),
               const ListTile(
@@ -92,7 +158,7 @@ class _SettingsViewState extends State<SettingsView> {
               ListTile(
                 leading: _SettingsIcon(Icons.info_outline_rounded),
                 title: Text('M3U8 视频下载器'),
-                subtitle: Text('版本 1.1.2'),
+                subtitle: Text('版本 1.1.6'),
               ),
               Divider(indent: 64),
               ListTile(

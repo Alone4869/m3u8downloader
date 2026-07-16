@@ -1,4 +1,4 @@
-package com.example.m3u8downloader
+package io.github.alone4869.m3u8downloader
 
 import android.content.Context
 import android.net.Uri

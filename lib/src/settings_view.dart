@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_update.dart';
 import 'download_bridge.dart';
 import 'glass_surface.dart';
 import 'smb_settings.dart';
@@ -15,6 +16,8 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   SmbConfig? _smbConfig;
   TwitterDownloadRoute _downloadRoute = TwitterDownloadRoute.direct;
+  AppVersion? _appVersion;
+  bool _checkingUpdate = false;
 
   @override
   void initState() {
@@ -25,13 +28,73 @@ class _SettingsViewState extends State<SettingsView> {
   Future<void> _reload() async {
     final configFuture = SmbSettingsStore.instance.load();
     final routeFuture = TwitterDownloadSettingsStore.instance.load();
+    final versionFuture = AppUpdateService().getCurrentVersion();
     final config = await configFuture;
     final route = await routeFuture;
+    final version = await versionFuture;
     if (mounted) {
       setState(() {
         _smbConfig = config;
         _downloadRoute = route;
+        _appVersion = version;
       });
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    if (_checkingUpdate) return;
+    setState(() => _checkingUpdate = true);
+    final service = AppUpdateService();
+    try {
+      final current = _appVersion ?? await service.getCurrentVersion();
+      final release = await service.fetchLatestRelease();
+      if (!mounted) return;
+      if (release.isNewerThan(current)) {
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            icon: const Icon(Icons.system_update_rounded),
+            title: Text('发现新版本 ${release.version}'),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: SingleChildScrollView(
+                child: Text(
+                  release.notes.isEmpty ? release.title : release.notes,
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('稍后'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  await service.openRelease(release);
+                },
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('下载更新'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('已是最新版本 ${current.version}')));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is UpdateNotConfiguredException
+          ? '当前构建未配置公开更新仓库'
+          : '检查更新失败：$error';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      service.close();
+      if (mounted) setState(() => _checkingUpdate = false);
     }
   }
 
@@ -153,18 +216,42 @@ class _SettingsViewState extends State<SettingsView> {
             ],
           ),
           const _SettingsHeader('关于'),
-          const _SettingsCard(
+          _SettingsCard(
             children: [
               ListTile(
-                leading: _SettingsIcon(Icons.info_outline_rounded),
-                title: Text('M3U8 视频下载器'),
-                subtitle: Text('版本 1.1.6'),
+                leading: const _SettingsIcon(Icons.system_update_outlined),
+                title: const Text('检查更新'),
+                subtitle: Text(
+                  _appVersion == null
+                      ? '正在读取版本…'
+                      : '当前版本 ${_appVersion!.display}',
+                ),
+                trailing: _checkingUpdate
+                    ? const SizedBox.square(
+                        dimension: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.chevron_right_rounded),
+                onTap: _checkingUpdate ? null : _checkForUpdates,
               ),
-              Divider(indent: 64),
-              ListTile(
+              const Divider(indent: 64),
+              const ListTile(
                 leading: _SettingsIcon(Icons.verified_user_outlined),
                 title: Text('内容与隐私'),
                 subtitle: Text('请仅处理你有权下载和上传的内容'),
+              ),
+              const Divider(indent: 64),
+              ListTile(
+                leading: const _SettingsIcon(Icons.code_rounded),
+                title: const Text('开源许可'),
+                subtitle: const Text('查看本项目及第三方软件许可'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => showLicensePage(
+                  context: context,
+                  applicationName: 'M3U8 视频下载器',
+                  applicationVersion: _appVersion?.display,
+                  applicationLegalese: 'Copyright 2026 Alone4869 · MIT License',
+                ),
               ),
             ],
           ),

@@ -1,10 +1,11 @@
-package com.example.m3u8downloader
+package io.github.alone4869.m3u8downloader
 
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
@@ -66,6 +67,35 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "getTasks" -> result.success(TaskStore.getTasks(this))
+                "getAppInfo" -> {
+                    val info = packageManager.getPackageInfo(packageName, 0)
+                    val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        info.longVersionCode
+                    } else {
+                        @Suppress("DEPRECATION")
+                        info.versionCode.toLong()
+                    }
+                    result.success(
+                        mapOf(
+                            "versionName" to info.versionName.orEmpty(),
+                            "versionCode" to versionCode,
+                        ),
+                    )
+                }
+                "openUrl" -> {
+                    val url = call.argument<String>("url").orEmpty()
+                    val uri = Uri.parse(url)
+                    if (uri.scheme !in setOf("http", "https")) {
+                        result.error("invalid_url", "仅支持 HTTP 或 HTTPS 地址", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("open_failed", error.message ?: "无法打开下载地址", null)
+                    }
+                }
                 "ensureLocalMediaAccess" -> {
                     val fileNames = call.argument<List<String>>("fileNames").orEmpty()
                     val contentUris = call.argument<List<String>>("contentUris").orEmpty()

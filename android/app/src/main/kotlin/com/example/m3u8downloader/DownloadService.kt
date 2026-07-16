@@ -1,4 +1,4 @@
-package com.example.m3u8downloader
+package io.github.alone4869.m3u8downloader
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -550,9 +550,9 @@ class DownloadService : Service() {
     class DownloadCancelledException : IOException("下载已取消")
 
     companion object {
-        const val ACTION_START = "com.example.m3u8downloader.START"
-        const val ACTION_CANCEL = "com.example.m3u8downloader.CANCEL"
-        const val ACTION_TASK_UPDATE = "com.example.m3u8downloader.TASK_UPDATE"
+        const val ACTION_START = "io.github.alone4869.m3u8downloader.START"
+        const val ACTION_CANCEL = "io.github.alone4869.m3u8downloader.CANCEL"
+        const val ACTION_TASK_UPDATE = "io.github.alone4869.m3u8downloader.TASK_UPDATE"
         const val EXTRA_URL = "url"
         const val EXTRA_FILE_NAME = "fileName"
         const val EXTRA_COOKIE = "cookie"

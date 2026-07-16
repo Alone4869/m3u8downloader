@@ -1,5 +1,10 @@
 # flutter\_inappwebview\_android
 
+> This vendored copy comes from `flutter_inappwebview` v6.1.5 (Android
+> package v1.1.3). This project changed both build types to use
+> `proguard-android-optimize.txt` instead of the AGP 9-removed
+> `proguard-android.txt`. See the adjacent Apache-2.0 `LICENSE`.
+
 The Android WebView implementation of [`flutter_inappwebview`](https://pub.dev/packages/flutter_inappwebview).
 
 ## Usage

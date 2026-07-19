@@ -15,9 +15,6 @@ class SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<SettingsView> {
   SmbConfig? _smbConfig;
-  TwitterDownloadRoute _downloadRoute = TwitterDownloadRoute.direct;
-  AppVersion? _appVersion;
-  bool _checkingUpdate = false;
 
   @override
   void initState() {
@@ -26,19 +23,228 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _reload() async {
-    final configFuture = SmbSettingsStore.instance.load();
-    final routeFuture = TwitterDownloadSettingsStore.instance.load();
-    final versionFuture = AppUpdateService().getCurrentVersion();
-    final config = await configFuture;
-    final route = await routeFuture;
-    final version = await versionFuture;
+    final config = await SmbSettingsStore.instance.load();
+    if (mounted) {
+      setState(() => _smbConfig = config);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            const _SettingsHero(),
+            const _SettingsHeader('功能设置'),
+            _SettingsCard(
+              children: [
+                ListTile(
+                  leading: const _SettingsIcon(Icons.download_outlined),
+                  title: const Text('下载与性能'),
+                  subtitle: const Text('下载位置、X 视频线路和并发策略'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DownloadSettingsPage(),
+                    ),
+                  ),
+                ),
+                const Divider(indent: 64),
+                ListTile(
+                  leading: const _SettingsIcon(Icons.dns_outlined),
+                  title: const Text('SMB 上传'),
+                  subtitle: Text(
+                    _smbConfig?.isConfigured == true
+                        ? '${_smbConfig!.host}/${_smbConfig!.share}'
+                        : '连接 NAS 或局域网文件服务器',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SmbSettingsPage(),
+                      ),
+                    );
+                    _reload();
+                  },
+                ),
+              ],
+            ),
+            const _SettingsHeader('应用'),
+            _SettingsCard(
+              children: [
+                ListTile(
+                  leading: const _SettingsIcon(Icons.info_outline_rounded),
+                  title: const Text('关于应用'),
+                  subtitle: const Text('版本更新、内容使用说明和开源许可'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AboutSettingsPage(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 96),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DownloadSettingsPage extends StatefulWidget {
+  const DownloadSettingsPage({super.key});
+
+  @override
+  State<DownloadSettingsPage> createState() => _DownloadSettingsPageState();
+}
+
+class _DownloadSettingsPageState extends State<DownloadSettingsPage> {
+  TwitterDownloadRoute _downloadRoute = TwitterDownloadRoute.direct;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final route = await TwitterDownloadSettingsStore.instance.load();
     if (mounted) {
       setState(() {
-        _smbConfig = config;
         _downloadRoute = route;
-        _appVersion = version;
+        _loading = false;
       });
     }
+  }
+
+  Future<void> _selectRoute(TwitterDownloadRoute route) async {
+    if (route == _downloadRoute) return;
+    await TwitterDownloadSettingsStore.instance.save(route);
+    if (!mounted) return;
+    setState(() => _downloadRoute = route);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('已切换为${route.title}')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('下载与性能')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              children: [
+                const _SettingsHeader('文件保存'),
+                const _SettingsCard(
+                  children: [
+                    ListTile(
+                      leading: _SettingsIcon(Icons.folder_outlined),
+                      title: Text('下载位置'),
+                      subtitle: Text('系统“下载/M3U8 Downloader”目录'),
+                    ),
+                  ],
+                ),
+                const _SettingsHeader('X 视频下载线路'),
+                _SettingsCard(
+                  children: [
+                    for (
+                      var index = 0;
+                      index < TwitterDownloadRoute.values.length;
+                      index++
+                    ) ...[
+                      if (index > 0) const Divider(indent: 64),
+                      _DownloadRouteTile(
+                        route: TwitterDownloadRoute.values[index],
+                        selected:
+                            TwitterDownloadRoute.values[index] ==
+                            _downloadRoute,
+                        onTap: () =>
+                            _selectRoute(TwitterDownloadRoute.values[index]),
+                      ),
+                    ],
+                  ],
+                ),
+                const _SettingsHeader('性能'),
+                const _SettingsCard(
+                  children: [
+                    ListTile(
+                      leading: _SettingsIcon(Icons.bolt_outlined),
+                      title: Text('并发下载'),
+                      subtitle: Text('单个任务自动使用最多 6 路连接，兼顾速度与稳定性'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _DownloadRouteTile extends StatelessWidget {
+  const _DownloadRouteTile({
+    required this.route,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final TwitterDownloadRoute route;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: _SettingsIcon(
+        route == TwitterDownloadRoute.direct
+            ? Icons.speed_rounded
+            : Icons.cloud_download_outlined,
+      ),
+      title: Text(route.title),
+      subtitle: Text(route.description),
+      trailing: Icon(
+        selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+        color: selected ? colors.primary : colors.outline,
+      ),
+      selected: selected,
+      onTap: onTap,
+    );
+  }
+}
+
+class AboutSettingsPage extends StatefulWidget {
+  const AboutSettingsPage({super.key});
+
+  @override
+  State<AboutSettingsPage> createState() => _AboutSettingsPageState();
+}
+
+class _AboutSettingsPageState extends State<AboutSettingsPage> {
+  AppVersion? _appVersion;
+  bool _checkingUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final version = await AppUpdateService().getCurrentVersion();
+    if (mounted) setState(() => _appVersion = version);
   }
 
   Future<void> _checkForUpdates() async {
@@ -100,170 +306,64 @@ class _SettingsViewState extends State<SettingsView> {
     }
   }
 
-  Future<void> _editDownloadRoute() async {
-    final selected = await showDialog<TwitterDownloadRoute>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.route_rounded),
-        title: const Text('X 视频下载线路'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final route in TwitterDownloadRoute.values)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  route == TwitterDownloadRoute.direct
-                      ? Icons.speed_rounded
-                      : Icons.cloud_download_outlined,
-                ),
-                title: Text(route.title),
-                subtitle: Text(route.description),
-                trailing: route == _downloadRoute
-                    ? Icon(
-                        Icons.check_circle_rounded,
-                        color: Theme.of(dialogContext).colorScheme.primary,
-                      )
-                    : const Icon(Icons.circle_outlined),
-                onTap: () => Navigator.pop(dialogContext, route),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
-          ),
-        ],
-      ),
-    );
-    if (selected == null || selected == _downloadRoute) return;
-    await TwitterDownloadSettingsStore.instance.save(selected);
-    if (!mounted) return;
-    setState(() => _downloadRoute = selected);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('下载线路已切换为${selected.title}')));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        bottom: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            const _SettingsHero(),
-            const _SettingsHeader('通用设置'),
-            _SettingsCard(
-              children: [
-                const ListTile(
-                  leading: _SettingsIcon(Icons.folder_outlined),
-                  title: Text('下载位置'),
-                  subtitle: Text('下载/M3U8 Downloader'),
+      appBar: AppBar(title: const Text('关于应用')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        children: [
+          const _SettingsHeader('版本'),
+          _SettingsCard(
+            children: [
+              ListTile(
+                leading: const _SettingsIcon(Icons.system_update_outlined),
+                title: const Text('检查更新'),
+                subtitle: Text(
+                  _appVersion == null
+                      ? '正在读取当前版本'
+                      : '当前版本 ${_appVersion!.display}',
                 ),
-                const Divider(indent: 64),
-                ListTile(
-                  leading: const _SettingsIcon(Icons.route_rounded),
-                  title: const Text('X 视频下载线路'),
-                  subtitle: Text(
-                    '${_downloadRoute.title} · ${_downloadRoute.description}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: _editDownloadRoute,
+                trailing: _checkingUpdate
+                    ? const SizedBox.square(
+                        dimension: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.chevron_right_rounded),
+                onTap: _checkingUpdate ? null : _checkForUpdates,
+              ),
+              const Divider(indent: 64),
+              const ListTile(
+                leading: _SettingsIcon(Icons.install_mobile_outlined),
+                title: Text('升级与数据'),
+                subtitle: Text('安装新版时直接覆盖安装，可保留任务记录和应用设置'),
+              ),
+            ],
+          ),
+          const _SettingsHeader('使用与许可'),
+          _SettingsCard(
+            children: [
+              const ListTile(
+                leading: _SettingsIcon(Icons.verified_user_outlined),
+                title: Text('内容使用说明'),
+                subtitle: Text('仅处理你拥有权利或已获授权下载、保存和上传的内容'),
+              ),
+              const Divider(indent: 64),
+              ListTile(
+                leading: const _SettingsIcon(Icons.code_rounded),
+                title: const Text('开源软件许可'),
+                subtitle: const Text('查看本应用及所用第三方软件的许可信息'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => showLicensePage(
+                  context: context,
+                  applicationName: 'M3U8 视频下载器',
+                  applicationVersion: _appVersion?.display,
+                  applicationLegalese: 'Copyright 2026 Alone4869 · MIT License',
                 ),
-                const Divider(indent: 64),
-                const ListTile(
-                  leading: _SettingsIcon(Icons.bolt_outlined),
-                  title: Text('高速下载'),
-                  subtitle: Text('每个任务最多 6 路连接'),
-                ),
-                const Divider(indent: 64),
-                const ListTile(
-                  leading: _SettingsIcon(Icons.shield_outlined),
-                  title: Text('数据保护'),
-                  subtitle: Text('升级请直接覆盖安装；任务记录与非敏感设置跟随系统备份'),
-                ),
-              ],
-            ),
-            const _SettingsHeader('上传设置'),
-            _SettingsCard(
-              children: [
-                ListTile(
-                  leading: const _SettingsIcon(Icons.dns_outlined),
-                  title: const Text('SMB 服务器'),
-                  subtitle: Text(
-                    _smbConfig?.isConfigured == true
-                        ? '${_smbConfig!.host}/${_smbConfig!.share}'
-                        : '尚未配置远端存储',
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () async {
-                    await Navigator.push<void>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const SmbSettingsPage(),
-                      ),
-                    );
-                    _reload();
-                  },
-                ),
-                const Divider(indent: 64),
-                const ListTile(
-                  leading: _SettingsIcon(Icons.speed_rounded),
-                  title: Text('上传引擎'),
-                  subtitle: Text('SMB 2/3 · 自适应窗口 · 多连接上传'),
-                ),
-              ],
-            ),
-            const _SettingsHeader('关于'),
-            _SettingsCard(
-              children: [
-                ListTile(
-                  leading: const _SettingsIcon(Icons.system_update_outlined),
-                  title: const Text('检查更新'),
-                  subtitle: Text(
-                    _appVersion == null
-                        ? '正在读取版本…'
-                        : '当前版本 ${_appVersion!.display}',
-                  ),
-                  trailing: _checkingUpdate
-                      ? const SizedBox.square(
-                          dimension: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.chevron_right_rounded),
-                  onTap: _checkingUpdate ? null : _checkForUpdates,
-                ),
-                const Divider(indent: 64),
-                const ListTile(
-                  leading: _SettingsIcon(Icons.verified_user_outlined),
-                  title: Text('内容与隐私'),
-                  subtitle: Text('请仅处理你有权下载和上传的内容'),
-                ),
-                const Divider(indent: 64),
-                ListTile(
-                  leading: const _SettingsIcon(Icons.code_rounded),
-                  title: const Text('开源许可'),
-                  subtitle: const Text('查看本项目及第三方软件许可'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => showLicensePage(
-                    context: context,
-                    applicationName: 'M3U8 视频下载器',
-                    applicationVersion: _appVersion?.display,
-                    applicationLegalese:
-                        'Copyright 2026 Alone4869 · MIT License',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 96),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -490,7 +590,7 @@ class _SmbSettingsPageState extends State<SmbSettingsPage> {
                         const SizedBox(width: 14),
                         Expanded(
                           child: Text(
-                            '连接局域网 NAS 或文件服务器。凭据仅保存在设备安全存储中。',
+                            '连接 NAS 或局域网文件服务器。支持 SMB 2/3 多连接上传；密码仅保存在设备安全存储中。',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: Theme.of(

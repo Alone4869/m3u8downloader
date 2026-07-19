@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow Semantic Versioning; the `+N` suffix in `pubspec.yaml` is the monotonically increasing Android build number.
 
+## 1.2.9 - 2026-07-19
+
+- Reorganize Settings into focused secondary pages for download performance and app information.
+- Clarify download, update, content usage, and SMB descriptions.
+
 ## 1.2.8 - 2026-07-16
 
 - Simplify and center the top headers across the home, downloads, and settings pages.

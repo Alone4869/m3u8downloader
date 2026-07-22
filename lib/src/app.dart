@@ -947,7 +947,7 @@ class _DownloadsViewState extends State<DownloadsView>
   void initState() {
     super.initState();
     _tabController =
-        TabController(length: 2, initialIndex: _tabIndex, vsync: this)
+        TabController(length: 3, initialIndex: _tabIndex, vsync: this)
           ..addListener(() {
             if (!_tabController.indexIsChanging && mounted) {
               setState(() {
@@ -993,6 +993,7 @@ class _DownloadsViewState extends State<DownloadsView>
 
   List<DownloadTask> get _visibleTasks => _tasks.values.where((task) {
     if (_tabIndex == 1) return task.status == DownloadStatus.completed;
+    if (_tabIndex == 2) return task.isPendingUpload;
     return task.status != DownloadStatus.completed;
   }).toList();
 
@@ -1112,11 +1113,15 @@ class _DownloadsViewState extends State<DownloadsView>
             final bTime = b.completedAt > 0 ? b.completedAt : b.createdAt;
             return bTime.compareTo(aTime);
           });
+    final pendingUploadTasks = completedTasks
+        .where((task) => task.isPendingUpload)
+        .toList();
     return DownloadsPageFrame(
       header: DownloadsHeader(
         controller: _tabController,
         activeCount: activeTasks.length,
         completedCount: completedTasks.length,
+        pendingUploadCount: pendingUploadTasks.length,
         editing: _editing,
         hasTasks: _visibleTasks.isNotEmpty,
         onEdit: () => setState(() => _editing = true),
@@ -1139,6 +1144,15 @@ class _DownloadsViewState extends State<DownloadsView>
                   tasks: completedTasks,
                   emptyIcon: Icons.video_library_outlined,
                   emptyTitle: '还没有已完成的视频',
+                  editing: _editing,
+                  selectedIds: _selectedIds,
+                  onToggle: _toggleTask,
+                ),
+                _DownloadSection(
+                  tasks: pendingUploadTasks,
+                  emptyIcon: Icons.cloud_done_outlined,
+                  emptyTitle: '没有未上传的视频',
+                  emptySubtitle: '下载完成且尚未上传的任务会显示在这里',
                   editing: _editing,
                   selectedIds: _selectedIds,
                   onToggle: _toggleTask,
@@ -1209,6 +1223,7 @@ class DownloadsHeader extends StatelessWidget {
     required this.controller,
     required this.activeCount,
     required this.completedCount,
+    required this.pendingUploadCount,
     required this.editing,
     required this.hasTasks,
     required this.onEdit,
@@ -1217,6 +1232,7 @@ class DownloadsHeader extends StatelessWidget {
   final TabController controller;
   final int activeCount;
   final int completedCount;
+  final int pendingUploadCount;
   final bool editing;
   final bool hasTasks;
   final VoidCallback onEdit;
@@ -1290,6 +1306,7 @@ class DownloadsHeader extends StatelessWidget {
               tabs: [
                 Tab(text: '进行中 $activeCount'),
                 Tab(text: '已完成 $completedCount'),
+                Tab(text: '未上传 $pendingUploadCount'),
               ],
             ),
           ),
@@ -1361,6 +1378,7 @@ class _DownloadSection extends StatelessWidget {
     required this.tasks,
     required this.emptyIcon,
     required this.emptyTitle,
+    this.emptySubtitle = '从浏览器捕获视频链接后，任务会显示在这里',
     required this.editing,
     required this.selectedIds,
     required this.onToggle,
@@ -1371,6 +1389,7 @@ class _DownloadSection extends StatelessWidget {
   final List<DownloadTask> unresolvedTasks;
   final IconData emptyIcon;
   final String emptyTitle;
+  final String emptySubtitle;
   final bool editing;
   final Set<String> selectedIds;
   final ValueChanged<DownloadTask> onToggle;
@@ -1378,7 +1397,11 @@ class _DownloadSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (tasks.isEmpty && unresolvedTasks.isEmpty) {
-      return _EmptyDownloads(icon: emptyIcon, title: emptyTitle);
+      return _EmptyDownloads(
+        icon: emptyIcon,
+        title: emptyTitle,
+        subtitle: emptySubtitle,
+      );
     }
     return ListView(
       padding: EdgeInsets.fromLTRB(
@@ -1452,10 +1475,15 @@ class _SectionHeading extends StatelessWidget {
 }
 
 class _EmptyDownloads extends StatelessWidget {
-  const _EmptyDownloads({required this.icon, required this.title});
+  const _EmptyDownloads({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
   final IconData icon;
   final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -1485,7 +1513,8 @@ class _EmptyDownloads extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '从浏览器捕获视频链接后，任务会显示在这里',
+            subtitle,
+            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

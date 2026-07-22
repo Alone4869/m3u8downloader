@@ -41,6 +41,35 @@ void main() {
     expect(task.sourceUrl, isEmpty);
   });
 
+  test('only completed tasks that have not uploaded are pending upload', () {
+    const pending = DownloadTask(
+      id: 'pending',
+      url: 'https://example.com/pending.mp4',
+      fileName: 'pending.mp4',
+      status: DownloadStatus.completed,
+      progress: 1,
+    );
+    const uploaded = DownloadTask(
+      id: 'uploaded',
+      url: 'https://example.com/uploaded.mp4',
+      fileName: 'uploaded.mp4',
+      status: DownloadStatus.completed,
+      progress: 1,
+      uploaded: true,
+    );
+    const failed = DownloadTask(
+      id: 'failed',
+      url: 'https://example.com/failed.mp4',
+      fileName: 'failed.mp4',
+      status: DownloadStatus.failed,
+      progress: 0.5,
+    );
+
+    expect(pending.isPendingUpload, isTrue);
+    expect(uploaded.isPendingUpload, isFalse);
+    expect(failed.isPendingUpload, isFalse);
+  });
+
   test('passes the original source URL when starting a download', () async {
     const channel = MethodChannel('m3u8_downloader/methods');
     MethodCall? capturedCall;

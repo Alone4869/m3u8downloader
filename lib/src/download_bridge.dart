@@ -56,6 +56,8 @@ class DownloadTask {
   final int completedAt;
   final int fileSize;
   final bool uploaded;
+
+  bool get isPendingUpload => status == DownloadStatus.completed && !uploaded;
 }
 
 class SmbFolderEntry {

@@ -79,4 +79,37 @@ void main() {
     // 24px system inset + 68px floating navigation are kept clear.
     expect(tester.getTopLeft(find.byKey(actionsKey)).dy, 344);
   });
+
+  testWidgets('downloads header shows the pending uploads tab', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DefaultTabController(
+          length: 3,
+          initialIndex: 1,
+          child: Builder(
+            builder: (context) => Scaffold(
+              body: DownloadsHeader(
+                controller: DefaultTabController.of(context),
+                activeCount: 2,
+                completedCount: 7,
+                pendingUploadCount: 3,
+                editing: false,
+                hasTasks: true,
+                onEdit: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('进行中 2'), findsOneWidget);
+    expect(find.text('已完成 7'), findsOneWidget);
+    expect(find.text('未上传 3'), findsOneWidget);
+  });
 }

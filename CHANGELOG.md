@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow Semantic Versioning; the `+N` suffix in `pubspec.yaml` is the monotonically increasing Android build number.
 
+## 1.3.0 - 2026-07-22
+
+- Add a pending uploads tab that tracks completed videos not yet uploaded to SMB.
+- Replace the default Flutter launcher icon with adaptive, round, and themed app icons.
+
 ## 1.2.9 - 2026-07-19
 
 - Reorganize Settings into focused secondary pages for download performance and app information.

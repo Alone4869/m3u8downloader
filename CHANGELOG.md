@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here. Versions follow Semantic Versioning; the `+N` suffix in `pubspec.yaml` is the monotonically increasing Android build number.
 
+## 1.3.2 - 2026-07-26
+
+- Redesign the SMB upload folder picker with a compact responsive layout, clearer navigation, and polished loading, empty, and error states.
+
 ## 1.3.1 - 2026-07-26
 
 - Support navigating into nested SMB folders when choosing an upload destination.

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -338,94 +339,320 @@ class _SmbFolderPickerState extends State<_SmbFolderPicker> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('选择上传文件夹'),
-      content: SizedBox(
-        width: 480,
-        height: 420,
-        child: Column(
-          children: [
-            Row(
-              children: [
-                IconButton(
-                  tooltip: '返回上一级',
-                  onPressed: _locations.length > 1 && !_loading ? _goUp : null,
-                  icon: const Icon(Icons.arrow_upward),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _displayPath,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final visibleRows = _loading || _error != null
+        ? 2
+        : _folders.length.clamp(2, 6);
+    final preferredHeight = (252.0 + visibleRows * 58)
+        .clamp(390.0, 580.0)
+        .toDouble();
+    final maxDialogHeight = (screenHeight * 0.72)
+        .clamp(390.0, 580.0)
+        .toDouble();
+    final dialogHeight = math.min(preferredHeight, maxDialogHeight);
+
+    return Dialog(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: AppSurface(
+        borderRadius: 24,
+        elevated: true,
+        child: SizedBox(
+          width: 440,
+          height: dialogHeight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: colors.primaryContainer,
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      Text(
-                        '仅显示当前层级的文件夹，不读取文件内容',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      child: Icon(
+                        Icons.drive_folder_upload_outlined,
+                        color: colors.onPrimaryContainer,
                       ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: '刷新',
-                  onPressed: _loading ? null : _loadCurrentFolder,
-                  icon: const Icon(Icons.refresh),
-                ),
-              ],
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                  ? Center(
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('读取失败：$_error', textAlign: TextAlign.center),
-                          const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            onPressed: _loadCurrentFolder,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('重试'),
+                          Text(
+                            '选择上传文件夹',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'SMB · ${widget.config.share}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ),
-                    )
-                  : _folders.isEmpty
-                  ? const Center(child: Text('当前目录下没有子文件夹'))
-                  : ListView.builder(
-                      itemCount: _folders.length,
-                      itemBuilder: (context, index) {
-                        final folder = _folders[index];
-                        return ListTile(
-                          leading: const Icon(Icons.folder),
-                          title: Text(folder.name),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => _openFolder(folder),
-                        );
-                      },
                     ),
-            ),
-          ],
+                    IconButton(
+                      tooltip: '关闭',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Material(
+                  color: colors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 6, 8),
+                    child: Row(
+                      children: [
+                        if (_locations.length > 1)
+                          IconButton.filledTonal(
+                            tooltip: '返回上一级',
+                            onPressed: _loading ? null : _goUp,
+                            icon: const Icon(Icons.arrow_back),
+                          )
+                        else
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: colors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: Icon(
+                              Icons.storage_outlined,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _currentLocation.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _locations.length == 1 ? '共享根目录' : _displayPath,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '刷新',
+                          onPressed: _loading ? null : _loadCurrentFolder,
+                          icon: const Icon(Icons.refresh),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.filter_alt_outlined,
+                      size: 16,
+                      color: colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '仅显示文件夹，不读取文件内容',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Material(
+                    color: colors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(16),
+                    clipBehavior: Clip.antiAlias,
+                    child: _buildFolderList(context),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: colors.outlineVariant),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('取消'),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _loading || _error != null
+                            ? null
+                            : () =>
+                                  Navigator.pop(context, _currentLocation.url),
+                        icon: const Icon(Icons.check),
+                        label: const Text('选择此文件夹'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+    );
+  }
+
+  Widget _buildFolderList(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_outlined, size: 32, color: colors.error),
+              const SizedBox(height: 10),
+              Text(
+                '无法读取此文件夹',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _error!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _loadCurrentFolder,
+                icon: const Icon(Icons.refresh),
+                label: const Text('重试'),
+              ),
+            ],
+          ),
         ),
-        FilledButton.icon(
-          onPressed: _loading || _error != null
-              ? null
-              : () => Navigator.pop(context, _currentLocation.url),
-          icon: const Icon(Icons.drive_folder_upload_outlined),
-          label: const Text('选择当前文件夹'),
+      );
+    }
+    if (_folders.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.folder_off_outlined,
+                size: 36,
+                color: colors.onSurfaceVariant,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '没有子文件夹',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '仍可选择当前文件夹作为上传位置',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
-      ],
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: _folders.length,
+      separatorBuilder: (_, _) => Divider(
+        height: 1,
+        indent: 62,
+        color: colors.outlineVariant.withValues(alpha: 0.55),
+      ),
+      itemBuilder: (context, index) {
+        final folder = _folders[index];
+        return ListTile(
+          minTileHeight: 56,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          leading: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.folder_outlined,
+              size: 22,
+              color: colors.onSecondaryContainer,
+            ),
+          ),
+          title: Text(
+            folder.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          trailing: Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+          onTap: () => _openFolder(folder),
+        );
+      },
     );
   }
 }

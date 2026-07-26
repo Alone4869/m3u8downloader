@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import jcifs.CIFSContext
 import jcifs.DialectVersion
+import jcifs.ResourceFilter
 import jcifs.config.PropertyConfiguration
 import jcifs.context.BaseContext
 import jcifs.smb.NtlmPasswordAuthenticator
@@ -78,15 +79,22 @@ class SmbClient(private val androidContext: Context, private val config: SmbConf
     fun listFolders(path: String): List<Map<String, String>> {
         return directory(path).use { directory ->
             if (!directory.exists() || !directory.isDirectory) error("远程目录不存在")
-            directory.listFiles()
-                .filter { it.isDirectory }
-                .map { folder ->
-                    mapOf(
-                        "name" to folder.name.removeSuffix("/"),
-                        "url" to folder.path,
-                    )
+
+            // SMB does not provide a portable server-side "directories only"
+            // query. Stream the directory enumeration and discard files as they
+            // arrive instead of materializing every child as an SmbFile array.
+            val folders = mutableListOf<Map<String, String>>()
+            directory.children(ResourceFilter { child -> child.isDirectory }).use { children ->
+                while (children.hasNext()) {
+                    children.next().use { folder ->
+                        folders += mapOf(
+                            "name" to folder.name.removeSuffix("/"),
+                            "url" to folder.locator.url.toString(),
+                        )
+                    }
                 }
-                .sortedBy { it["name"]?.lowercase() }
+            }
+            folders.sortedBy { it["name"]?.lowercase() }
         }
     }
 

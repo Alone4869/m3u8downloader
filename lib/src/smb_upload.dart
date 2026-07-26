@@ -270,36 +270,71 @@ class _SmbFolderPicker extends StatefulWidget {
   State<_SmbFolderPicker> createState() => _SmbFolderPickerState();
 }
 
+class _SmbFolderLocation {
+  const _SmbFolderLocation({required this.name, required this.url});
+
+  final String name;
+  final String url;
+}
+
 class _SmbFolderPickerState extends State<_SmbFolderPicker> {
   List<SmbFolderEntry> _folders = const [];
-  String? _selectedUrl;
-  String? _selectedName;
+  final List<_SmbFolderLocation> _locations = [];
   bool _loading = true;
   String? _error;
+  int _loadGeneration = 0;
+
+  _SmbFolderLocation get _currentLocation => _locations.last;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _locations.add(_SmbFolderLocation(name: widget.config.share, url: ''));
+    _loadCurrentFolder();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadCurrentFolder() async {
+    final generation = ++_loadGeneration;
+    final path = _currentLocation.url;
     setState(() {
       _loading = true;
       _error = null;
+      _folders = const [];
     });
     try {
       final folders = await DownloadBridge.instance.listSmbFolders(
         widget.config.toMap(),
-        '',
+        path,
       );
-      if (mounted) setState(() => _folders = folders);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _folders = folders);
+      }
     } catch (error) {
-      if (mounted) setState(() => _error = '$error');
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _error = '$error');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
+
+  void _openFolder(SmbFolderEntry folder) {
+    setState(() {
+      _locations.add(_SmbFolderLocation(name: folder.name, url: folder.url));
+    });
+    _loadCurrentFolder();
+  }
+
+  void _goUp() {
+    if (_locations.length <= 1 || _loading) return;
+    setState(() => _locations.removeLast());
+    _loadCurrentFolder();
+  }
+
+  String get _displayPath =>
+      _locations.map((location) => location.name).join(' / ');
 
   @override
   Widget build(BuildContext context) {
@@ -312,24 +347,31 @@ class _SmbFolderPickerState extends State<_SmbFolderPicker> {
           children: [
             Row(
               children: [
-                const Icon(Icons.storage_outlined),
-                const SizedBox(width: 12),
+                IconButton(
+                  tooltip: '返回上一级',
+                  onPressed: _locations.length > 1 && !_loading ? _goUp : null,
+                  icon: const Icon(Icons.arrow_upward),
+                ),
+                const SizedBox(width: 4),
                 Expanded(
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: '${widget.config.share}\n'),
-                        TextSpan(
-                          text: '点击文件夹即可选择，不会读取其内容',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _displayPath,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '仅显示当前层级的文件夹，不读取文件内容',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
                 ),
                 IconButton(
                   tooltip: '刷新',
-                  onPressed: _load,
+                  onPressed: _loading ? null : _loadCurrentFolder,
                   icon: const Icon(Icons.refresh),
                 ),
               ],
@@ -339,33 +381,31 @@ class _SmbFolderPickerState extends State<_SmbFolderPicker> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                  ? Center(child: Text('读取失败：$_error'))
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('读取失败：$_error', textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: _loadCurrentFolder,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('重试'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _folders.isEmpty
+                  ? const Center(child: Text('当前目录下没有子文件夹'))
                   : ListView.builder(
-                      itemCount: _folders.length + 1,
+                      itemCount: _folders.length,
                       itemBuilder: (context, index) {
-                        final isRoot = index == 0;
-                        final folder = isRoot ? null : _folders[index - 1];
-                        final url = folder?.url ?? '';
-                        final selected = _selectedUrl == url;
+                        final folder = _folders[index];
                         return ListTile(
-                          selected: selected,
-                          leading: Icon(
-                            isRoot ? Icons.storage_outlined : Icons.folder,
-                          ),
-                          title: Text(folder?.name ?? '共享根目录'),
-                          subtitle: isRoot ? Text(widget.config.share) : null,
-                          trailing: Icon(
-                            selected
-                                ? Icons.check_circle
-                                : Icons.radio_button_unchecked,
-                            color: selected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.outline,
-                          ),
-                          onTap: () => setState(() {
-                            _selectedUrl = url;
-                            _selectedName = folder?.name ?? '共享根目录';
-                          }),
+                          leading: const Icon(Icons.folder),
+                          title: Text(folder.name),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _openFolder(folder),
                         );
                       },
                     ),
@@ -379,14 +419,11 @@ class _SmbFolderPickerState extends State<_SmbFolderPicker> {
           child: const Text('取消'),
         ),
         FilledButton.icon(
-          onPressed: _loading || _error != null || _selectedUrl == null
+          onPressed: _loading || _error != null
               ? null
-              : () => Navigator.pop(context, _selectedUrl),
+              : () => Navigator.pop(context, _currentLocation.url),
           icon: const Icon(Icons.drive_folder_upload_outlined),
-          label: Text(
-            _selectedName == null ? '请选择文件夹' : '上传到 $_selectedName',
-            overflow: TextOverflow.ellipsis,
-          ),
+          label: const Text('选择当前文件夹'),
         ),
       ],
     );

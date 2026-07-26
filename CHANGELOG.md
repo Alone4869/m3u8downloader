@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow Semantic Versioning; the `+N` suffix in `pubspec.yaml` is the monotonically increasing Android build number.
 
+## 1.3.1 - 2026-07-26
+
+- Support navigating into nested SMB folders when choosing an upload destination.
+- Stream SMB directory enumeration and keep file entries out of the folder picker to reduce memory usage in large directories.
+
 ## 1.3.0 - 2026-07-22
 
 - Add a pending uploads tab that tracks completed videos not yet uploaded to SMB.

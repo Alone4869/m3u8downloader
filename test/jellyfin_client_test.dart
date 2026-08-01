@@ -190,6 +190,22 @@ void main() {
     );
   });
 
+  test('fetchPlaybackUrl wraps malformed body as exception', () async {
+    final client = _client(
+      (request) async => http.Response('not json', 200),
+    );
+    await expectLater(
+      client.fetchPlaybackUrl('d1'),
+      throwsA(
+        isA<JellyfinException>().having(
+          (e) => e.message,
+          'message',
+          '无法获取播放地址，请检查网络',
+        ),
+      ),
+    );
+  });
+
   test('401 responses throw statusCode 401 exception', () async {
     final client = _client((request) async => http.Response('', 401));
     await expectLater(

@@ -221,7 +221,7 @@ class JellyfinClient {
       'ParentId': parentId,
       'Recursive': 'true',
       'Limit': '0',
-      if (itemType != null) 'IncludeItemTypes': itemType,
+      'IncludeItemTypes': ?itemType,
     }) as Map<String, dynamic>;
     return data['TotalRecordCount'] as int?;
   }
@@ -247,9 +247,8 @@ class JellyfinClient {
   }
 
   Future<String> fetchPlaybackUrl(String id) async {
-    final http.Response response;
     try {
-      response = await _http
+      final response = await _http
           .post(
             _uri('/Items/$id/PlaybackInfo', {'UserId': userId}),
             headers: _authHeaders,
@@ -261,27 +260,29 @@ class JellyfinClient {
             }),
           )
           .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 401) {
+        throw const JellyfinException('登录已过期，请重新连接', statusCode: 401);
+      }
+      if (response.statusCode != 200) {
+        throw JellyfinException('无法获取播放地址（${response.statusCode}）');
+      }
+      final data =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      final sources = data['MediaSources'] as List<dynamic>? ?? const [];
+      if (sources.isEmpty) {
+        throw const JellyfinException('该影片没有可播放的媒体源');
+      }
+      final mediaSourceId = (sources.first as Map<String, dynamic>)['Id'];
+      if (mediaSourceId is! String || mediaSourceId.isEmpty) {
+        throw const JellyfinException('该影片没有可播放的媒体源');
+      }
+      return '$_base/videos/$id/master.m3u8'
+          '?api_key=$accessToken&MediaSourceId=$mediaSourceId&UserId=$userId';
+    } on JellyfinException {
+      rethrow;
     } catch (_) {
       throw const JellyfinException('无法获取播放地址，请检查网络');
     }
-    if (response.statusCode == 401) {
-      throw const JellyfinException('登录已过期，请重新连接', statusCode: 401);
-    }
-    if (response.statusCode != 200) {
-      throw JellyfinException('无法获取播放地址（${response.statusCode}）');
-    }
-    final data =
-        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-    final sources = data['MediaSources'] as List<dynamic>? ?? const [];
-    if (sources.isEmpty) {
-      throw const JellyfinException('该影片没有可播放的媒体源');
-    }
-    final mediaSourceId = (sources.first as Map<String, dynamic>)['Id'];
-    if (mediaSourceId is! String || mediaSourceId.isEmpty) {
-      throw const JellyfinException('该影片没有可播放的媒体源');
-    }
-    return '$_base/videos/$id/master.m3u8'
-        '?api_key=$accessToken&MediaSourceId=$mediaSourceId&UserId=$userId';
   }
 
   String imageUrl(String id, {String? tag, int? maxWidth}) => _imageUrl(

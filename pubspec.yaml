@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_inappwebview: ^6.1.5
   liquid_glass_easy: ^3.3.0
+  http: ^1.2.0
+  url_launcher: ^6.3.0
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^10.3.1
 
@@ -49,6 +51,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  url_launcher_platform_interface: ^2.3.0
 
 dependency_overrides:
   # AGP 9 removed the legacy proguard-android.txt default.

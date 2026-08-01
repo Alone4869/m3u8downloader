@@ -44,20 +44,17 @@ void main() {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
-      calls.add(call);
-      return null;
-    });
+          calls.add(call);
+          return null;
+        });
 
-    final launched = await const VideoPlayerLauncher(isAndroid: true).launch(
-      'http://192.168.1.10:8096/videos/d1/stream.mp4?api_key=tok',
-    );
+    final launched = await const VideoPlayerLauncher(
+      isAndroid: true,
+    ).launch('http://192.168.1.10:8096/videos/d1/stream.mp4?api_key=tok');
 
     expect(launched, isTrue);
     expect(calls.single.method, 'playVideo');
-    expect(
-      (calls.single.arguments as Map)['url'],
-      contains('stream.mp4'),
-    );
+    expect((calls.single.arguments as Map)['url'], contains('stream.mp4'));
     expect((calls.single.arguments as Map).containsKey('package'), isFalse);
     expect(fakeLauncher.launchedUrl, isNull);
   });
@@ -66,14 +63,13 @@ void main() {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
-      calls.add(call);
-      return null;
-    });
+          calls.add(call);
+          return null;
+        });
 
-    final launched = await const VideoPlayerLauncher(isAndroid: true).launch(
-      'http://x/stream.mp4',
-      package: 'org.videolan.vlc',
-    );
+    final launched = await const VideoPlayerLauncher(
+      isAndroid: true,
+    ).launch('http://x/stream.mp4', package: 'org.videolan.vlc');
 
     expect(launched, isTrue);
     expect((calls.single.arguments as Map)['package'], 'org.videolan.vlc');
@@ -86,18 +82,18 @@ void main() {
           (call) async => throw PlatformException(code: 'no_player'),
         );
 
-    final launched = await const VideoPlayerLauncher(isAndroid: true).launch(
-      'http://x/stream.mp4',
-    );
+    final launched = await const VideoPlayerLauncher(
+      isAndroid: true,
+    ).launch('http://x/stream.mp4');
 
     expect(launched, isFalse);
     expect(fakeLauncher.launchedUrl, isNull);
   });
 
   test('falls back to url_launcher on non-Android platforms', () async {
-    final launched = await const VideoPlayerLauncher(isAndroid: false).launch(
-      'http://x/stream.mp4',
-    );
+    final launched = await const VideoPlayerLauncher(
+      isAndroid: false,
+    ).launch('http://x/stream.mp4');
 
     expect(launched, isTrue);
     expect(fakeLauncher.launchedUrl, 'http://x/stream.mp4');
@@ -106,16 +102,16 @@ void main() {
   test('queryPlayers parses installed players from the channel', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
-      expect(call.method, 'queryVideoPlayers');
-      return [
-        {'package': 'org.videolan.vlc', 'label': 'VLC'},
-        {'package': 'is.xyz.mpv', 'label': 'MPV'},
-      ];
-    });
+          expect(call.method, 'queryVideoPlayers');
+          return [
+            {'package': 'org.videolan.vlc', 'label': 'VLC'},
+            {'package': 'is.xyz.mpv', 'label': 'MPV'},
+          ];
+        });
 
-    final players = await const VideoPlayerLauncher(isAndroid: true).queryPlayers(
-      'http://x/stream.mp4',
-    );
+    final players = await const VideoPlayerLauncher(
+      isAndroid: true,
+    ).queryPlayers('http://x/stream.mp4');
 
     expect(players, hasLength(2));
     expect(players.first.package, 'org.videolan.vlc');
@@ -127,13 +123,13 @@ void main() {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
-      calls.add(call);
-      return null;
-    });
+          calls.add(call);
+          return null;
+        });
 
-    final launched = await const VideoPlayerLauncher(isAndroid: true).launchInApp(
-      'http://x/stream.mp4',
-    );
+    final launched = await const VideoPlayerLauncher(
+      isAndroid: true,
+    ).launchInApp('http://x/stream.mp4');
 
     expect(launched, isTrue);
     expect(calls.single.method, 'playInApp');
@@ -147,14 +143,14 @@ void main() {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
-      calls.add(call);
-      if (call.method == 'queryVideoPlayers') {
-        return [
-          {'package': 'org.videolan.vlc', 'label': 'VLC'},
-        ];
-      }
-      return null;
-    });
+          calls.add(call);
+          if (call.method == 'queryVideoPlayers') {
+            return [
+              {'package': 'org.videolan.vlc', 'label': 'VLC'},
+            ];
+          }
+          return null;
+        });
 
     bool? launched;
     await tester.pumpWidget(
@@ -197,14 +193,14 @@ void main() {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
-      calls.add(call);
-      if (call.method == 'queryVideoPlayers') {
-        return [
-          {'package': 'org.videolan.vlc', 'label': 'VLC'},
-        ];
-      }
-      return null;
-    });
+          calls.add(call);
+          if (call.method == 'queryVideoPlayers') {
+            return [
+              {'package': 'org.videolan.vlc', 'label': 'VLC'},
+            ];
+          }
+          return null;
+        });
 
     bool? launched;
     await tester.pumpWidget(
@@ -247,14 +243,14 @@ void main() {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
-      calls.add(call);
-      if (call.method == 'queryVideoPlayers') {
-        return [
-          {'package': 'is.xyz.mpv', 'label': 'MPV'},
-        ];
-      }
-      return null;
-    });
+          calls.add(call);
+          if (call.method == 'queryVideoPlayers') {
+            return [
+              {'package': 'is.xyz.mpv', 'label': 'MPV'},
+            ];
+          }
+          return null;
+        });
 
     bool? launched;
     await tester.pumpWidget(
@@ -293,10 +289,10 @@ void main() {
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
-      calls.add(call);
-      if (call.method == 'queryVideoPlayers') return [];
-      return null;
-    });
+          calls.add(call);
+          if (call.method == 'queryVideoPlayers') return [];
+          return null;
+        });
 
     bool? launched;
     await tester.pumpWidget(

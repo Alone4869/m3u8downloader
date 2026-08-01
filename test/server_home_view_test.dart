@@ -28,7 +28,10 @@ JellyfinClient _loginClient() => JellyfinClient(
   httpClient: MockClient((request) async {
     if (request.url.path.endsWith('/Users/AuthenticateByName')) {
       return http.Response(
-        jsonEncode({'User': {'Id': 'u1'}, 'AccessToken': 'tok'}),
+        jsonEncode({
+          'User': {'Id': 'u1'},
+          'AccessToken': 'tok',
+        }),
         200,
         headers: _jsonHeaders,
       );

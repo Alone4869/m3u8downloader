@@ -40,8 +40,9 @@ Future<void> _pumpLibrary(WidgetTester tester, JellyfinClient client) async {
 
 MockClient _pagedMock({int total = 96}) {
   return MockClient((request) async {
-    final startIndex =
-        int.parse(request.url.queryParameters['StartIndex'] ?? '0');
+    final startIndex = int.parse(
+      request.url.queryParameters['StartIndex'] ?? '0',
+    );
     final items = [
       for (var i = 0; i < 48 && startIndex + i < total; i++)
         {
@@ -67,18 +68,12 @@ void main() {
   testWidgets('scrolls near the end to load the next page', (tester) async {
     await _pumpLibrary(tester, _client(_pagedMock()));
 
-    await tester.drag(
-      find.byType(CustomScrollView),
-      const Offset(0, -12000),
-    );
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -12000));
     await tester.pumpAndSettle();
 
     expect(find.text('第49部'), findsOneWidget);
 
-    await tester.drag(
-      find.byType(CustomScrollView),
-      const Offset(0, -12000),
-    );
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -12000));
     await tester.pumpAndSettle();
 
     expect(find.text('第96部'), findsOneWidget);
@@ -86,10 +81,9 @@ void main() {
 
   testWidgets('shows empty message for an empty library', (tester) async {
     final client = _client(
-      MockClient((request) async => _ok({
-        'Items': <Object>[],
-        'TotalRecordCount': 0,
-      })),
+      MockClient(
+        (request) async => _ok({'Items': <Object>[], 'TotalRecordCount': 0}),
+      ),
     );
     await _pumpLibrary(tester, client);
 

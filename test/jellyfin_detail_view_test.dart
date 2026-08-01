@@ -134,7 +134,8 @@ void main() {
                 result = await Navigator.push<String>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => JellyfinDetailView(itemId: 'd1', client: client),
+                    builder: (_) =>
+                        JellyfinDetailView(itemId: 'd1', client: client),
                   ),
                 );
               },
@@ -187,7 +188,8 @@ void main() {
                 result = await Navigator.push<String>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => JellyfinDetailView(itemId: 'd1', client: client),
+                    builder: (_) =>
+                        JellyfinDetailView(itemId: 'd1', client: client),
                   ),
                 );
               },

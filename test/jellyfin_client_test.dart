@@ -24,7 +24,10 @@ void main() {
       httpClient: MockClient((request) async {
         expect(request.method, 'POST');
         expect(request.url.path, '/Users/AuthenticateByName');
-        return _ok({'User': {'Id': 'u1'}, 'AccessToken': 'abc'});
+        return _ok({
+          'User': {'Id': 'u1'},
+          'AccessToken': 'abc',
+        });
       }),
     );
     await client.login(
@@ -44,11 +47,7 @@ void main() {
     await expectLater(
       client.login(baseUrl: 'http://a', username: 'a', password: 'b'),
       throwsA(
-        isA<JellyfinException>().having(
-          (e) => e.message,
-          'message',
-          '账号或密码错误',
-        ),
+        isA<JellyfinException>().having((e) => e.message, 'message', '账号或密码错误'),
       ),
     );
   });
@@ -70,17 +69,19 @@ void main() {
   });
 
   test('fetchViews parses views', () async {
-    final client = _client((request) async => _ok({
-          'Items': [
-            {
-              'Id': 'v1',
-              'Name': '电影',
-              'CollectionType': 'movies',
-              'ImageTags': {'Primary': 't1'},
-            },
-            {'Id': 'v2', 'Name': '剧集', 'CollectionType': 'tvshows'},
-          ],
-        }));
+    final client = _client(
+      (request) async => _ok({
+        'Items': [
+          {
+            'Id': 'v1',
+            'Name': '电影',
+            'CollectionType': 'movies',
+            'ImageTags': {'Primary': 't1'},
+          },
+          {'Id': 'v2', 'Name': '剧集', 'CollectionType': 'tvshows'},
+        ],
+      }),
+    );
     final views = await client.fetchViews();
     expect(views, hasLength(2));
     expect(views.first.id, 'v1');
@@ -90,16 +91,18 @@ void main() {
   });
 
   test('fetchResume parses progress percentage', () async {
-    final client = _client((request) async => _ok({
-          'Items': [
-            {
-              'Id': 'r1',
-              'Type': 'Movie',
-              'Name': '继续片',
-              'UserData': {'PlayedPercentage': 42},
-            },
-          ],
-        }));
+    final client = _client(
+      (request) async => _ok({
+        'Items': [
+          {
+            'Id': 'r1',
+            'Type': 'Movie',
+            'Name': '继续片',
+            'UserData': {'PlayedPercentage': 42},
+          },
+        ],
+      }),
+    );
     final items = await client.fetchResume();
     expect(items.single.name, '继续片');
     expect(items.single.progress, closeTo(0.42, 0.001));
@@ -199,9 +202,8 @@ void main() {
     expect(item.audioCodec, isNull);
   });
 
-  test('fetchViewCount reads TotalRecordCount', () async {    final client = _client(
-      (request) async => _ok({'TotalRecordCount': 128}),
-    );
+  test('fetchViewCount reads TotalRecordCount', () async {
+    final client = _client((request) async => _ok({'TotalRecordCount': 128}));
     expect(await client.fetchViewCount('v1', itemType: 'Movie'), 128);
   });
 
@@ -247,7 +249,11 @@ void main() {
     final client = _client((request) async {
       expect(request.method, 'POST');
       expect(request.url.path, '/Items/d1/PlaybackInfo');
-      return _ok({'MediaSources': [{'Id': 'ms1'}]});
+      return _ok({
+        'MediaSources': [
+          {'Id': 'ms1'},
+        ],
+      });
     });
     final url = await client.fetchPlaybackUrl('d1');
     expect(
@@ -282,9 +288,7 @@ void main() {
   });
 
   test('fetchPlaybackUrl wraps malformed body as exception', () async {
-    final client = _client(
-      (request) async => http.Response('not json', 200),
-    );
+    final client = _client((request) async => http.Response('not json', 200));
     await expectLater(
       client.fetchPlaybackUrl('d1'),
       throwsA(
@@ -302,11 +306,7 @@ void main() {
     await expectLater(
       client.fetchViews(),
       throwsA(
-        isA<JellyfinException>().having(
-          (e) => e.statusCode,
-          'statusCode',
-          401,
-        ),
+        isA<JellyfinException>().having((e) => e.statusCode, 'statusCode', 401),
       ),
     );
   });

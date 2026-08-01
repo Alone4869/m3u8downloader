@@ -98,9 +98,7 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
         Navigator.pop(context, true);
         return;
       }
-      final message = error is JellyfinException
-          ? error.message
-          : '加载失败，请重试';
+      final message = error is JellyfinException ? error.message : '加载失败，请重试';
       if (refresh) {
         ScaffoldMessenger.of(
           context,
@@ -147,9 +145,7 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
       final url = await _client.fetchPlaybackUrl(item.id);
       final launched = await const VideoPlayerLauncher().launch(url);
       if (!launched && mounted) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('未找到可播放的应用')),
-        );
+        messenger.showSnackBar(const SnackBar(content: Text('未找到可播放的应用')));
       }
     } catch (error) {
       if (!mounted) return;
@@ -217,15 +213,11 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
                           child: _EmptyView(),
                         ),
                       if (_resume.isNotEmpty) ...[
-                        const SliverToBoxAdapter(
-                          child: _SectionTitle('继续观看'),
-                        ),
+                        const SliverToBoxAdapter(child: _SectionTitle('继续观看')),
                         SliverToBoxAdapter(child: _buildResumeRow()),
                       ],
                       if (_views.isNotEmpty) ...[
-                        const SliverToBoxAdapter(
-                          child: _SectionTitle('媒体库'),
-                        ),
+                        const SliverToBoxAdapter(child: _SectionTitle('媒体库')),
                         SliverToBoxAdapter(child: _buildViewsRow()),
                       ],
                       for (final view in _views)
@@ -233,9 +225,7 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
                           SliverToBoxAdapter(
                             child: _SectionTitle('${view.name} · 最新添加'),
                           ),
-                          SliverToBoxAdapter(
-                            child: _buildLatestRow(view.id),
-                          ),
+                          SliverToBoxAdapter(child: _buildLatestRow(view.id)),
                         ],
                       const SliverToBoxAdapter(child: SizedBox(height: 120)),
                     ],
@@ -319,7 +309,11 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final item = _resume[index];
-          return _ResumeCard(item: item, client: _client, onTap: () => _play(item));
+          return _ResumeCard(
+            item: item,
+            client: _client,
+            onTap: () => _play(item),
+          );
         },
       ),
     );
@@ -385,7 +379,11 @@ class _CarouselItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final backdrop = item.backdropImageTag != null
-        ? client.backdropUrl(item.id, tag: item.backdropImageTag, maxWidth: 1600)
+        ? client.backdropUrl(
+            item.id,
+            tag: item.backdropImageTag,
+            maxWidth: 1600,
+          )
         : item.primaryImageTag != null
         ? client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1600)
         : null;
@@ -764,8 +762,7 @@ class _PosterCard extends StatelessWidget {
                     ? Image.network(
                         poster,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            const JellyfinPlaceholder(),
+                        errorBuilder: (_, _, _) => const JellyfinPlaceholder(),
                       )
                     : const JellyfinPlaceholder(),
               ),
@@ -830,10 +827,7 @@ class _EmptyView extends StatelessWidget {
             color: Colors.white38,
           ),
           const SizedBox(height: 14),
-          const Text(
-            '这个服务器上还没有媒体库',
-            style: TextStyle(color: Colors.white70),
-          ),
+          const Text('这个服务器上还没有媒体库', style: TextStyle(color: Colors.white70)),
         ],
       ),
     );

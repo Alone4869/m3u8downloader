@@ -210,9 +210,11 @@ class JellyfinClient {
   }
 
   Future<List<JellyfinItem>> fetchResume() async {
-    final data = await _getJson('/Users/$userId/Items/Resume', {
-      'Fields': 'BackdropImageTags,Genres',
-    }) as Map<String, dynamic>;
+    final data =
+        await _getJson('/Users/$userId/Items/Resume', {
+              'Fields': 'BackdropImageTags,Genres',
+            })
+            as Map<String, dynamic>;
     return _parseItems(data['Items']);
   }
 
@@ -220,24 +222,23 @@ class JellyfinClient {
     required String parentId,
     int limit = 12,
   }) async {
-    final data = await _getJson(
-      '/Users/$userId/Items/Latest',
-      {
-        'ParentId': parentId,
-        'Limit': '$limit',
-        'Fields': 'BackdropImageTags,Genres',
-      },
-    );
+    final data = await _getJson('/Users/$userId/Items/Latest', {
+      'ParentId': parentId,
+      'Limit': '$limit',
+      'Fields': 'BackdropImageTags,Genres',
+    });
     return _parseItems(data);
   }
 
   Future<int?> fetchViewCount(String parentId, {String? itemType}) async {
-    final data = await _getJson('/Users/$userId/Items', {
-      'ParentId': parentId,
-      'Recursive': 'true',
-      'Limit': '0',
-      'IncludeItemTypes': ?itemType,
-    }) as Map<String, dynamic>;
+    final data =
+        await _getJson('/Users/$userId/Items', {
+              'ParentId': parentId,
+              'Recursive': 'true',
+              'Limit': '0',
+              'IncludeItemTypes': ?itemType,
+            })
+            as Map<String, dynamic>;
     return data['TotalRecordCount'] as int?;
   }
 
@@ -246,21 +247,24 @@ class JellyfinClient {
     int limit = 48,
     int startIndex = 0,
   }) async {
-    final data = await _getJson('/Users/$userId/Items', {
-      'ParentId': parentId,
-      'Recursive': 'true',
-      'Limit': '$limit',
-      'StartIndex': '$startIndex',
-      'Fields': 'BackdropImageTags,Genres',
-    }) as Map<String, dynamic>;
+    final data =
+        await _getJson('/Users/$userId/Items', {
+              'ParentId': parentId,
+              'Recursive': 'true',
+              'Limit': '$limit',
+              'StartIndex': '$startIndex',
+              'Fields': 'BackdropImageTags,Genres',
+            })
+            as Map<String, dynamic>;
     return _parseItems(data['Items']);
   }
 
   Future<JellyfinItem> fetchItem(String id) async {
-    final data = await _getJson(
-      '/Users/$userId/Items/$id',
-      {'Fields': 'People,Genres,Overview,BackdropImageTags,MediaSources'},
-    ) as Map<String, dynamic>;
+    final data =
+        await _getJson('/Users/$userId/Items/$id', {
+              'Fields': 'People,Genres,Overview,BackdropImageTags,MediaSources',
+            })
+            as Map<String, dynamic>;
     return _parseItem(data);
   }
 
@@ -297,8 +301,9 @@ class JellyfinClient {
       }
       final direct =
           mediaSource['SupportsDirectStream'] == true &&
-          ((mediaSource['Container'] as String? ?? '').toLowerCase())
-              .contains('mp4');
+          ((mediaSource['Container'] as String? ?? '').toLowerCase()).contains(
+            'mp4',
+          );
       return '$_base/videos/$id/stream.mp4'
           '?api_key=$accessToken&MediaSourceId=$mediaSourceId'
           '&UserId=$userId&Static=$direct';
@@ -309,17 +314,11 @@ class JellyfinClient {
     }
   }
 
-  String imageUrl(String id, {String? tag, int? maxWidth}) => _imageUrl(
-    '/Items/$id/Images/Primary',
-    tag,
-    maxWidth,
-  );
+  String imageUrl(String id, {String? tag, int? maxWidth}) =>
+      _imageUrl('/Items/$id/Images/Primary', tag, maxWidth);
 
-  String backdropUrl(String id, {String? tag, int? maxWidth}) => _imageUrl(
-    '/Items/$id/Images/Backdrop/0',
-    tag,
-    maxWidth,
-  );
+  String backdropUrl(String id, {String? tag, int? maxWidth}) =>
+      _imageUrl('/Items/$id/Images/Backdrop/0', tag, maxWidth);
 
   String _imageUrl(String path, String? tag, int? maxWidth) {
     final params = <String, String>{
@@ -346,9 +345,7 @@ class JellyfinClient {
     final playedPercent = userData['PlayedPercentage'] as num?;
     final progress = playedPercent != null
         ? playedPercent.toDouble() / 100
-        : (runTimeTicks != null &&
-              runTimeTicks > 0 &&
-              playbackTicks > 0)
+        : (runTimeTicks != null && runTimeTicks > 0 && playbackTicks > 0)
         ? playbackTicks / runTimeTicks
         : 0;
     final media = _parseMediaInfo(data);
@@ -389,15 +386,19 @@ class JellyfinClient {
     );
   }
 
-  ({String? resolution, String? videoCodec, String? audioCodec, double? frameRate}) _parseMediaInfo(
-    Map<String, dynamic> data,
-  ) {
+  ({
+    String? resolution,
+    String? videoCodec,
+    String? audioCodec,
+    double? frameRate,
+  })
+  _parseMediaInfo(Map<String, dynamic> data) {
     final sources = data['MediaSources'] as List<dynamic>? ?? const [];
     final streams = sources.isEmpty
         ? const <dynamic>[]
         : (sources.first as Map<String, dynamic>?)?['MediaStreams']
-              as List<dynamic>?
-          ?? const <dynamic>[];
+                  as List<dynamic>? ??
+              const <dynamic>[];
     int? width;
     int? height;
     double? frameRate;
@@ -416,9 +417,7 @@ class JellyfinClient {
       }
     }
     return (
-      resolution: width != null && height != null
-          ? '${width}x$height'
-          : null,
+      resolution: width != null && height != null ? '${width}x$height' : null,
       videoCodec: videoCodec,
       audioCodec: audioCodec,
       frameRate: frameRate,

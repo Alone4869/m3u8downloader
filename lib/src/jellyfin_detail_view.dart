@@ -91,9 +91,7 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
       final url = await _client.fetchPlaybackUrl(item.id);
       final launched = await const VideoPlayerLauncher().launch(url);
       if (!launched && mounted) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('未找到可播放的应用')),
-        );
+        messenger.showSnackBar(const SnackBar(content: Text('未找到可播放的应用')));
       }
     } catch (error) {
       if (!mounted) return;
@@ -177,7 +175,11 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
 
   Widget _buildAppBar(JellyfinItem item) {
     final backdrop = item.backdropImageTag != null
-        ? _client.backdropUrl(item.id, tag: item.backdropImageTag, maxWidth: 1600)
+        ? _client.backdropUrl(
+            item.id,
+            tag: item.backdropImageTag,
+            maxWidth: 1600,
+          )
         : item.primaryImageTag != null
         ? _client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1600)
         : null;
@@ -301,9 +303,7 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [
-                for (final genre in item.genres) _GenreChip(genre),
-              ],
+              children: [for (final genre in item.genres) _GenreChip(genre)],
             ),
           ],
           if (item.overview.isNotEmpty) ...[
@@ -429,11 +429,7 @@ class _PersonCard extends StatelessWidget {
 }
 
 class _InfoChip extends StatelessWidget {
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-    this.iconColor,
-  });
+  const _InfoChip({required this.icon, required this.label, this.iconColor});
 
   final IconData icon;
   final String label;

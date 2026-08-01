@@ -84,7 +84,12 @@ MockClient _homeMock() => MockClient((request) async {
     if (query['StartIndex'] != null) {
       return _ok({
         'Items': [
-          {'Id': 'l1', 'Type': 'Movie', 'Name': '库内电影1', 'ImageTags': {'Primary': 'lp1'}},
+          {
+            'Id': 'l1',
+            'Type': 'Movie',
+            'Name': '库内电影1',
+            'ImageTags': {'Primary': 'lp1'},
+          },
           {'Id': 'l2', 'Type': 'Movie', 'Name': '库内电影2'},
         ],
       });
@@ -191,10 +196,7 @@ void main() {
         .widgetList<Image>(find.byType(Image))
         .map((image) => (image.image as NetworkImage).url)
         .toList();
-    expect(
-      urls,
-      contains(contains('/Items/v1/Images/Primary')),
-    );
+    expect(urls, contains(contains('/Items/v1/Images/Primary')));
   });
 
   testWidgets('tapping a library card opens its library list', (tester) async {
@@ -210,9 +212,7 @@ void main() {
 
   testWidgets('empty server shows friendly message', (tester) async {
     final client = _client(
-      MockClient(
-        (request) async => _ok({'Items': <Object>[]}),
-      ),
+      MockClient((request) async => _ok({'Items': <Object>[]})),
     );
     await _pumpHome(tester, client);
 

@@ -89,8 +89,10 @@ class VideoPlayerLauncher {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.play_circle_fill_rounded,
-                  color: Color(0xFF00A4DC)),
+              leading: const Icon(
+                Icons.play_circle_fill_rounded,
+                color: Color(0xFF00A4DC),
+              ),
               title: const Text(
                 '应用内播放',
                 style: TextStyle(color: Colors.white, fontSize: 15),
@@ -98,8 +100,10 @@ class VideoPlayerLauncher {
               onTap: () => Navigator.pop(sheetContext, '_in_app_'),
             ),
             ListTile(
-              leading: const Icon(Icons.smartphone_rounded,
-                  color: Colors.white70),
+              leading: const Icon(
+                Icons.smartphone_rounded,
+                color: Colors.white70,
+              ),
               title: const Text(
                 '系统播放器',
                 style: TextStyle(color: Colors.white, fontSize: 15),
@@ -108,8 +112,10 @@ class VideoPlayerLauncher {
             ),
             for (final player in players)
               ListTile(
-                leading: const Icon(Icons.play_circle_outline_rounded,
-                    color: Colors.white70),
+                leading: const Icon(
+                  Icons.play_circle_outline_rounded,
+                  color: Colors.white70,
+                ),
                 title: Text(
                   player.label,
                   style: const TextStyle(color: Colors.white, fontSize: 15),

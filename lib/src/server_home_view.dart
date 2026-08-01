@@ -43,10 +43,8 @@ class _ServerHomeViewState extends State<ServerHomeView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddServerSheet(
-        clientFactory: _clientFactory,
-        initial: initial,
-      ),
+      builder: (_) =>
+          _AddServerSheet(clientFactory: _clientFactory, initial: initial),
     );
     if (result == null || !mounted) return;
     await _store.save(result);
@@ -186,9 +184,9 @@ class _ServerHeader extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 '连接 Jellyfin、Emby 或 SMB 媒体库',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
               ),
             ],
           ),
@@ -303,7 +301,10 @@ class _ProtocolBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, icon) = switch (type) {
-      ServerType.jellyfin => (const Color(0xFF00A4DC), Icons.play_arrow_rounded),
+      ServerType.jellyfin => (
+        const Color(0xFF00A4DC),
+        Icons.play_arrow_rounded,
+      ),
       ServerType.emby => (const Color(0xFF52B54B), Icons.live_tv_rounded),
       ServerType.smb => (const Color(0xFFF59E0B), Icons.folder_rounded),
     };
@@ -344,14 +345,18 @@ class _EmptyServers extends StatelessWidget {
               color: colors.primaryContainer,
               borderRadius: BorderRadius.circular(28),
             ),
-            child: Icon(Icons.dns_outlined, size: 40, color: colors.onPrimaryContainer),
+            child: Icon(
+              Icons.dns_outlined,
+              size: 40,
+              color: colors.onPrimaryContainer,
+            ),
           ),
           const SizedBox(height: 18),
           Text(
             '添加你的第一个服务器',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           Text(
@@ -426,7 +431,8 @@ class _AddServerSheetState extends State<_AddServerSheet> {
         password: _password.text,
       );
       if (!mounted) return;
-      final id = widget.initial?.id ??
+      final id =
+          widget.initial?.id ??
           DateTime.now().millisecondsSinceEpoch.toString();
       final name = _name.text.trim().isEmpty
           ? _hostOf(_url.text.trim())
@@ -463,9 +469,7 @@ class _AddServerSheetState extends State<_AddServerSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: AppSurface(
         borderRadius: 28,
         child: SafeArea(
@@ -497,9 +501,9 @@ class _AddServerSheetState extends State<_AddServerSheet> {
           const SizedBox(height: 16),
           Text(
             '选择服务器类型',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 16),
           for (final type in ServerType.values) ...[
@@ -607,10 +611,7 @@ class _AddServerSheetState extends State<_AddServerSheet> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: colors.error,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: colors.error, fontSize: 13),
               ),
               const SizedBox(height: 10),
             ],
@@ -631,9 +632,9 @@ class _AddServerSheetState extends State<_AddServerSheet> {
             Text(
               '密码仅用于本次登录验证',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: colors.onSurfaceVariant),
             ),
           ],
         ),
@@ -667,7 +668,9 @@ class _ProtocolOption extends StatelessWidget {
       ServerType.smb => '局域网文件共享，浏览 NAS 上的视频文件',
     };
     return Material(
-      color: enabled ? colors.surfaceContainerLow : colors.surfaceContainerHighest.withValues(alpha: 0.5),
+      color: enabled
+          ? colors.surfaceContainerLow
+          : colors.surfaceContainerHighest.withValues(alpha: 0.5),
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),

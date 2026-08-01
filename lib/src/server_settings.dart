@@ -66,7 +66,8 @@ class FlutterSecureStorageAdapter implements SecureKeyValueStore {
 class ServerSettingsStore {
   ServerSettingsStore({SecureKeyValueStore? secureStorage})
     : _secureStorage =
-          secureStorage ?? FlutterSecureStorageAdapter(const FlutterSecureStorage());
+          secureStorage ??
+          FlutterSecureStorageAdapter(const FlutterSecureStorage());
 
   static final ServerSettingsStore instance = ServerSettingsStore();
 
@@ -107,7 +108,9 @@ class ServerSettingsStore {
           userId: preferences.getString(_userIdKey(id)) ?? '',
           accessToken: token ?? '',
           createdAt:
-              DateTime.tryParse(preferences.getString(_createdAtKey(id)) ?? '') ??
+              DateTime.tryParse(
+                preferences.getString(_createdAtKey(id)) ?? '',
+              ) ??
               DateTime.fromMillisecondsSinceEpoch(0),
         ),
       );

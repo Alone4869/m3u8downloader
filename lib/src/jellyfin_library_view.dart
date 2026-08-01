@@ -161,17 +161,14 @@ class _JellyfinLibraryViewState extends State<JellyfinLibraryView> {
                               crossAxisSpacing: 12,
                               childAspectRatio: 0.56,
                             ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final item = _items[index];
-                            return _LibraryPosterCard(
-                              item: item,
-                              client: _client,
-                              onTap: () => _openDetail(item),
-                            );
-                          },
-                          childCount: _items.length,
-                        ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final item = _items[index];
+                          return _LibraryPosterCard(
+                            item: item,
+                            client: _client,
+                            onTap: () => _openDetail(item),
+                          );
+                        }, childCount: _items.length),
                       ),
                     ),
                     if (_loadingMore)

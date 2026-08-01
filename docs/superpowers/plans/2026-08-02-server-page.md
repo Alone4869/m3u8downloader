@@ -2063,6 +2063,9 @@ MockClient _homeMock() => MockClient((request) async {
 });
 
 Future<void> _pumpHome(WidgetTester tester, JellyfinClient client) async {
+  tester.view.physicalSize = const Size(800, 1600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MaterialApp(
       home: JellyfinHomeView(config: _config(), client: client),
@@ -2113,7 +2116,7 @@ void main() {
     );
     await _pumpHome(tester, client);
 
-    expect(find.text('加载失败，请重试'), findsOneWidget);
+    expect(find.text('无法连接服务器，请检查网络'), findsOneWidget);
 
     failing = false;
     await tester.tap(find.text('重试'));
@@ -2214,6 +2217,7 @@ class JellyfinPlaceholder extends StatelessWidget {
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'jellyfin_client.dart';
 import 'jellyfin_detail_view.dart';
@@ -2409,6 +2413,11 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
                       SliverToBoxAdapter(child: _buildCarousel()),
+                      if (_views.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _EmptyView(),
+                        ),
                       if (_resume.isNotEmpty) ...[
                         const SliverToBoxAdapter(
                           child: _SectionTitle('继续观看'),
@@ -2964,6 +2973,31 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+class _EmptyView extends StatelessWidget {
+  const _EmptyView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.video_library_outlined,
+            size: 44,
+            color: Colors.white38,
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            '这个服务器上还没有媒体库',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});
 
@@ -3034,6 +3068,23 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
 git add lib/src/jellyfin_theme.dart lib/src/jellyfin_home_view.dart lib/src/jellyfin_detail_view.dart test/jellyfin_home_view_test.dart
 git commit -m "feat: add jellyfin cinematic home view"
 ```
+
+> ### Task 5 修正记录（计划缺陷修复，已并入上文代码块）
+>
+> 实现时发现并修复了 3 处计划缺陷（详见 `.superpowers/sdd/task-5-report.md` 与 `task-5-brief.md` 末尾修正记录）：
+>
+> 1. **测试视口过小**：默认测试视口 800x600，轮播高 = 800\*0.78 = 624px > 600px，
+>    后续分区（继续观看/媒体库等）位于折叠区之下，默认 finder 找不到。
+>    `_pumpHome` 已改为 800x1600 视口（`tester.view.physicalSize` + `addTearDown(tester.view.reset)`）。
+> 2. **空状态缺失**：原实现无媒体库时只渲染空轮播，测试断言 `'这个服务器上还没有媒体库'`
+>    无处命中。已在 slivers 中补充 `if (_views.isEmpty)` 的 `SliverFillRemaining(_EmptyView())`，
+>    并新增 `_EmptyView` widget（与 `_ErrorView` 风格一致）。
+> 3. **测试 3 断言错误**：客户端 `_getJson` 会把所有非 Jellyfin 异常包装为
+>    `'无法连接服务器，请检查网络'`（jellyfin_client.dart:182），`'加载失败，请重试'`
+>    分支在测试中不可达。断言已改为客户端真实消息（实现中的回退文案保留，作防御性代码）。
+>
+> 另：实现代码块的 import 列表原缺失 `package:url_launcher/url_launcher.dart`（`_launchExternal`
+> 用到 `launchUrl`/`LaunchMode`），已补上。
 
 ---
 

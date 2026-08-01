@@ -9,6 +9,7 @@ import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 import 'browser_settings.dart';
 import 'download_bridge.dart';
 import 'glass_surface.dart';
+import 'server_home_view.dart';
 import 'settings_view.dart';
 import 'smb_upload.dart';
 import 'twitter_home_view.dart';
@@ -238,6 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       }
                     },
                   ),
+                  const ServerHomeView(),
                   const SettingsView(),
                 ],
               ),
@@ -318,6 +320,11 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.download_outlined,
           selectedIcon: Icons.download_rounded,
           label: downloadLabel,
+        ),
+        const LiquidGlassTabBarItem(
+          icon: Icons.dns_outlined,
+          selectedIcon: Icons.dns_rounded,
+          label: '服务器',
         ),
         const LiquidGlassTabBarItem(
           icon: Icons.settings_outlined,

@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'jellyfin_client.dart';
 import 'jellyfin_detail_view.dart';
+import 'jellyfin_library_view.dart';
 import 'jellyfin_theme.dart';
 import 'server_settings.dart';
+import 'video_player_launcher.dart';
 
 class JellyfinHomeView extends StatefulWidget {
   const JellyfinHomeView({
@@ -144,7 +145,7 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final url = await _client.fetchPlaybackUrl(item.id);
-      final launched = await _launchExternal(url);
+      final launched = await const VideoPlayerLauncher().launch(url);
       if (!launched && mounted) {
         messenger.showSnackBar(
           const SnackBar(content: Text('未找到可播放的应用')),
@@ -166,15 +167,24 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
     }
   }
 
-  Future<bool> _launchExternal(String url) async {
-    return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-  }
-
   void _openDetail(JellyfinItem item) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => JellyfinDetailView(itemId: item.id, client: _client),
+      ),
+    ).then((result) {
+      if (result == 'expired' && mounted) {
+        Navigator.pop(context, true);
+      }
+    });
+  }
+
+  void _openLibrary(JellyfinView view) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => JellyfinLibraryView(view: view, client: _client),
       ),
     ).then((result) {
       if (result == 'expired' && mounted) {
@@ -329,10 +339,8 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
           return _LibraryCard(
             view: view,
             count: count,
-            onTap: () {
-              final items = _latest[view.id] ?? const [];
-              if (items.isNotEmpty) _openDetail(items.first);
-            },
+            client: _client,
+            onTap: () => _openLibrary(view),
           );
         },
       ),
@@ -378,6 +386,8 @@ class _CarouselItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final backdrop = item.backdropImageTag != null
         ? client.backdropUrl(item.id, tag: item.backdropImageTag, maxWidth: 1600)
+        : item.primaryImageTag != null
+        ? client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1600)
         : null;
     return GestureDetector(
       onTap: onOpen,
@@ -605,10 +615,16 @@ class _ResumeCard extends StatelessWidget {
 }
 
 class _LibraryCard extends StatelessWidget {
-  const _LibraryCard({required this.view, required this.count, required this.onTap});
+  const _LibraryCard({
+    required this.view,
+    required this.count,
+    required this.client,
+    required this.onTap,
+  });
 
   final JellyfinView view;
   final int? count;
+  final JellyfinClient client;
   final VoidCallback onTap;
 
   @override
@@ -637,42 +653,80 @@ class _LibraryCard extends StatelessWidget {
       'books' => '图书',
       _ => '媒体库',
     };
+    final cover = view.primaryImageTag != null
+        ? client.imageUrl(view.id, tag: view.primaryImageTag, maxWidth: 300)
+        : null;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: SizedBox(
         width: 150,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [accent.withValues(alpha: 0.30), accent.withValues(alpha: 0.10)],
-          ),
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Icon(icon, color: Colors.white, size: 30),
-            const Spacer(),
-            Text(
-              view.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (cover != null)
+                Image.network(
+                  cover,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                )
+              else
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        accent.withValues(alpha: 0.30),
+                        accent.withValues(alpha: 0.10),
+                      ],
+                    ),
+                  ),
+                ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.15),
+                      Colors.black.withValues(alpha: 0.75),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              countLabel,
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(icon, color: Colors.white, size: 30),
+                    const Spacer(),
+                    Text(
+                      view.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      countLabel,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

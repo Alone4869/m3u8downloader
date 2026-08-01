@@ -32,6 +32,11 @@ class JellyfinItem {
     this.indexNumber,
     this.parentIndexNumber,
     this.seriesName,
+    this.people = const [],
+    this.resolution,
+    this.videoCodec,
+    this.audioCodec,
+    this.frameRate,
   });
 
   final String id;
@@ -48,6 +53,11 @@ class JellyfinItem {
   final int? indexNumber;
   final int? parentIndexNumber;
   final String? seriesName;
+  final List<JellyfinPerson> people;
+  final String? resolution;
+  final String? videoCodec;
+  final String? audioCodec;
+  final double? frameRate;
 }
 
 class JellyfinPerson {
@@ -200,8 +210,9 @@ class JellyfinClient {
   }
 
   Future<List<JellyfinItem>> fetchResume() async {
-    final data =
-        await _getJson('/Users/$userId/Items/Resume') as Map<String, dynamic>;
+    final data = await _getJson('/Users/$userId/Items/Resume', {
+      'Fields': 'BackdropImageTags,Genres',
+    }) as Map<String, dynamic>;
     return _parseItems(data['Items']);
   }
 
@@ -211,7 +222,11 @@ class JellyfinClient {
   }) async {
     final data = await _getJson(
       '/Users/$userId/Items/Latest',
-      {'ParentId': parentId, 'Limit': '$limit'},
+      {
+        'ParentId': parentId,
+        'Limit': '$limit',
+        'Fields': 'BackdropImageTags,Genres',
+      },
     );
     return _parseItems(data);
   }
@@ -226,24 +241,27 @@ class JellyfinClient {
     return data['TotalRecordCount'] as int?;
   }
 
-  Future<JellyfinItem> fetchItem(String id) async {
-    final data = await _getJson('/Users/$userId/Items/$id')
-        as Map<String, dynamic>;
-    return _parseItem(data);
+  Future<List<JellyfinItem>> fetchItems({
+    required String parentId,
+    int limit = 48,
+    int startIndex = 0,
+  }) async {
+    final data = await _getJson('/Users/$userId/Items', {
+      'ParentId': parentId,
+      'Recursive': 'true',
+      'Limit': '$limit',
+      'StartIndex': '$startIndex',
+      'Fields': 'BackdropImageTags,Genres',
+    }) as Map<String, dynamic>;
+    return _parseItems(data['Items']);
   }
 
-  Future<List<JellyfinPerson>> fetchPeople(String id) async {
-    final data = await _getJson('/Items/$id/People') as List<dynamic>;
-    return [
-      for (final entry in data)
-        if (entry is Map<String, dynamic>)
-          JellyfinPerson(
-            id: entry['Id'] as String? ?? '',
-            name: entry['Name'] as String? ?? '',
-            role: entry['Role'] as String? ?? entry['Type'] as String? ?? '',
-            imageTag: entry['PrimaryImageTag'] as String?,
-          ),
-    ];
+  Future<JellyfinItem> fetchItem(String id) async {
+    final data = await _getJson(
+      '/Users/$userId/Items/$id',
+      {'Fields': 'People,Genres,Overview,BackdropImageTags,MediaSources'},
+    ) as Map<String, dynamic>;
+    return _parseItem(data);
   }
 
   Future<String> fetchPlaybackUrl(String id) async {
@@ -272,12 +290,18 @@ class JellyfinClient {
       if (sources.isEmpty) {
         throw const JellyfinException('该影片没有可播放的媒体源');
       }
-      final mediaSourceId = (sources.first as Map<String, dynamic>)['Id'];
+      final mediaSource = sources.first as Map<String, dynamic>;
+      final mediaSourceId = mediaSource['Id'];
       if (mediaSourceId is! String || mediaSourceId.isEmpty) {
         throw const JellyfinException('该影片没有可播放的媒体源');
       }
-      return '$_base/videos/$id/master.m3u8'
-          '?api_key=$accessToken&MediaSourceId=$mediaSourceId&UserId=$userId';
+      final direct =
+          mediaSource['SupportsDirectStream'] == true &&
+          ((mediaSource['Container'] as String? ?? '').toLowerCase())
+              .contains('mp4');
+      return '$_base/videos/$id/stream.mp4'
+          '?api_key=$accessToken&MediaSourceId=$mediaSourceId'
+          '&UserId=$userId&Static=$direct';
     } on JellyfinException {
       rethrow;
     } catch (_) {
@@ -327,6 +351,7 @@ class JellyfinClient {
               playbackTicks > 0)
         ? playbackTicks / runTimeTicks
         : 0;
+    final media = _parseMediaInfo(data);
     return JellyfinItem(
       id: data['Id'] as String? ?? '',
       type: data['Type'] as String? ?? '',
@@ -347,6 +372,56 @@ class JellyfinClient {
       indexNumber: data['IndexNumber'] as int?,
       parentIndexNumber: data['ParentIndexNumber'] as int?,
       seriesName: data['SeriesName'] as String?,
+      people: [
+        for (final person in data['People'] as List<dynamic>? ?? const [])
+          if (person is Map<String, dynamic>)
+            JellyfinPerson(
+              id: person['Id'] as String? ?? '',
+              name: person['Name'] as String? ?? '',
+              role: person['Role'] as String? ?? '',
+              imageTag: person['PrimaryImageTag'] as String?,
+            ),
+      ],
+      resolution: media.resolution,
+      videoCodec: media.videoCodec,
+      audioCodec: media.audioCodec,
+      frameRate: media.frameRate,
+    );
+  }
+
+  ({String? resolution, String? videoCodec, String? audioCodec, double? frameRate}) _parseMediaInfo(
+    Map<String, dynamic> data,
+  ) {
+    final sources = data['MediaSources'] as List<dynamic>? ?? const [];
+    final streams = sources.isEmpty
+        ? const <dynamic>[]
+        : (sources.first as Map<String, dynamic>?)?['MediaStreams']
+              as List<dynamic>?
+          ?? const <dynamic>[];
+    int? width;
+    int? height;
+    double? frameRate;
+    String? videoCodec;
+    String? audioCodec;
+    for (final stream in streams) {
+      if (stream is! Map<String, dynamic>) continue;
+      final type = stream['Type'] as String?;
+      if (type == 'Video') {
+        width = stream['Width'] as int?;
+        height = stream['Height'] as int?;
+        videoCodec = stream['Codec'] as String?;
+        frameRate = (stream['FrameRate'] as num?)?.toDouble();
+      } else if (type == 'Audio' && audioCodec == null) {
+        audioCodec = stream['Codec'] as String?;
+      }
+    }
+    return (
+      resolution: width != null && height != null
+          ? '${width}x$height'
+          : null,
+      videoCodec: videoCodec,
+      audioCodec: audioCodec,
+      frameRate: frameRate,
     );
   }
 }

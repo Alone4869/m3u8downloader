@@ -126,6 +126,7 @@ void main() {
     final items = await client.fetchLatest(parentId: 'v1', limit: 5);
     expect(seen!.queryParameters['ParentId'], 'v1');
     expect(seen!.queryParameters['Limit'], '5');
+    expect(seen!.queryParameters['Fields'], 'BackdropImageTags,Genres');
     expect(items.single.name, '新电影');
     expect(items.single.year, 2026);
     expect(items.single.runtimeMs, 900000);
@@ -133,42 +134,116 @@ void main() {
     expect(items.single.backdropImageTag, 'b1');
   });
 
-  test('fetchViewCount reads TotalRecordCount', () async {
-    final client = _client(
-      (request) async => _ok({'TotalRecordCount': 128}),
+  test('fetchItems pages through a library', () async {
+    Uri? seen;
+    final client = _client((request) async {
+      seen = request.url;
+      return _ok({
+        'Items': [
+          {'Id': 'i1', 'Type': 'Movie', 'Name': '第一页'},
+          {'Id': 'i2', 'Type': 'Movie', 'Name': '第二页'},
+        ],
+      });
+    });
+    final items = await client.fetchItems(
+      parentId: 'v1',
+      limit: 48,
+      startIndex: 48,
     );
-    expect(await client.fetchViewCount('v1', itemType: 'Movie'), 128);
+    expect(items, hasLength(2));
+    expect(items.first.name, '第一页');
+    expect(seen!.path, '/Users/u1/Items');
+    expect(seen!.queryParameters['ParentId'], 'v1');
+    expect(seen!.queryParameters['Recursive'], 'true');
+    expect(seen!.queryParameters['Limit'], '48');
+    expect(seen!.queryParameters['StartIndex'], '48');
   });
 
-  test('fetchItem parses detail', () async {
+  test('fetchItem parses media sources into media info', () async {
     final client = _client(
       (request) async => _ok({
         'Id': 'd1',
         'Type': 'Movie',
         'Name': '星际穿越',
-        'Overview': '一段旅程。',
         'ImageTags': {'Primary': 'p1'},
+        'MediaSources': [
+          {
+            'MediaStreams': [
+              {
+                'Type': 'Video',
+                'Codec': 'h264',
+                'Width': 1920,
+                'Height': 1080,
+                'FrameRate': 23.976,
+              },
+              {'Type': 'Audio', 'Codec': 'aac', 'Channels': 2},
+            ],
+          },
+        ],
       }),
     );
     final item = await client.fetchItem('d1');
+    expect(item.resolution, '1920x1080');
+    expect(item.videoCodec, 'h264');
+    expect(item.audioCodec, 'aac');
+    expect(item.frameRate, closeTo(23.976, 0.001));
+  });
+
+  test('fetchItem tolerates missing media sources', () async {
+    final client = _client(
+      (request) async => _ok({'Id': 'd1', 'Type': 'Movie', 'Name': '无媒体源'}),
+    );
+    final item = await client.fetchItem('d1');
+    expect(item.resolution, isNull);
+    expect(item.videoCodec, isNull);
+    expect(item.audioCodec, isNull);
+  });
+
+  test('fetchViewCount reads TotalRecordCount', () async {    final client = _client(
+      (request) async => _ok({'TotalRecordCount': 128}),
+    );
+    expect(await client.fetchViewCount('v1', itemType: 'Movie'), 128);
+  });
+
+  test('fetchItem requests fields and parses detail with people', () async {
+    Uri? seen;
+    final client = _client((request) async {
+      seen = request.url;
+      return _ok({
+        'Id': 'd1',
+        'Type': 'Movie',
+        'Name': '星际穿越',
+        'Overview': '一段旅程。',
+        'ImageTags': {'Primary': 'p1'},
+        'People': [
+          {'Id': 'p1', 'Name': '诺兰', 'Role': '导演', 'PrimaryImageTag': 'pp1'},
+          {'Id': 'p2', 'Name': '马修', 'Role': '演员'},
+        ],
+      });
+    });
+    final item = await client.fetchItem('d1');
+    expect(
+      seen!.queryParameters['Fields'],
+      'People,Genres,Overview,BackdropImageTags,MediaSources',
+    );
     expect(item.name, '星际穿越');
     expect(item.overview, '一段旅程。');
+    expect(item.people, hasLength(2));
+    expect(item.people.first.name, '诺兰');
+    expect(item.people.first.role, '导演');
+    expect(item.people.first.imageTag, 'pp1');
+    expect(item.people.last.imageTag, isNull);
   });
 
-  test('fetchPeople parses cast', () async {
+  test('fetchItem tolerates missing people field', () async {
     final client = _client(
-      (request) async => _ok([
-        {'Id': 'p1', 'Name': '诺兰', 'Role': '导演', 'PrimaryImageTag': 'pp1'},
-        {'Id': 'p2', 'Name': '马修', 'Role': '演员'},
-      ]),
+      (request) async => _ok({'Id': 'd1', 'Type': 'Movie', 'Name': '无演职员'}),
     );
-    final people = await client.fetchPeople('d1');
-    expect(people, hasLength(2));
-    expect(people.first.role, '导演');
-    expect(people.last.imageTag, isNull);
+    final item = await client.fetchItem('d1');
+    expect(item.people, isEmpty);
   });
 
-  test('fetchPlaybackUrl builds m3u8 url from media source', () async {
+  test('fetchPlaybackUrl builds progressive mp4 stream url', () async {
     final client = _client((request) async {
       expect(request.method, 'POST');
       expect(request.url.path, '/Items/d1/PlaybackInfo');
@@ -177,9 +252,25 @@ void main() {
     final url = await client.fetchPlaybackUrl('d1');
     expect(
       url,
-      'http://192.168.1.10:8096/videos/d1/master.m3u8'
-      '?api_key=tok&MediaSourceId=ms1&UserId=u1',
+      'http://192.168.1.10:8096/videos/d1/stream.mp4'
+      '?api_key=tok&MediaSourceId=ms1&UserId=u1&Static=false',
     );
+  });
+
+  test('fetchPlaybackUrl uses static stream for mp4 sources', () async {
+    final client = _client(
+      (request) async => _ok({
+        'MediaSources': [
+          {
+            'Id': 'ms1',
+            'Container': 'mov,mp4,m4a,3gp,3g2,mj2',
+            'SupportsDirectStream': true,
+          },
+        ],
+      }),
+    );
+    final url = await client.fetchPlaybackUrl('d1');
+    expect(url, contains('Static=true'));
   });
 
   test('fetchPlaybackUrl throws when no media source', () async {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'jellyfin_client.dart';
 import 'jellyfin_theme.dart';
+import 'video_player_launcher.dart';
 
 class JellyfinDetailView extends StatefulWidget {
   const JellyfinDetailView({
@@ -21,6 +21,7 @@ class JellyfinDetailView extends StatefulWidget {
 class _JellyfinDetailViewState extends State<JellyfinDetailView> {
   JellyfinItem? _item;
   List<JellyfinPerson> _people = [];
+  List<(IconData, String)> _mediaInfo = [];
   bool _loading = true;
   String? _error;
   bool _expanded = false;
@@ -40,14 +41,12 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        _client.fetchItem(widget.itemId),
-        _client.fetchPeople(widget.itemId),
-      ]);
+      final item = await _client.fetchItem(widget.itemId);
       if (!mounted) return;
       setState(() {
-        _item = results.first as JellyfinItem;
-        _people = results.last as List<JellyfinPerson>;
+        _item = item;
+        _people = item.people;
+        _mediaInfo = _buildMediaInfo(item);
         _loading = false;
       });
     } catch (error) {
@@ -63,6 +62,26 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
     }
   }
 
+  List<(IconData, String)> _buildMediaInfo(JellyfinItem item) {
+    final info = <(IconData, String)>[];
+    if (item.resolution != null) {
+      info.add((Icons.high_quality_outlined, item.resolution!));
+    }
+    if (item.videoCodec != null) {
+      info.add((Icons.videocam_outlined, item.videoCodec!));
+    }
+    if (item.audioCodec != null) {
+      info.add((Icons.audiotrack_outlined, item.audioCodec!));
+    }
+    if (item.frameRate != null) {
+      info.add((
+        Icons.speed_outlined,
+        '${item.frameRate!.toStringAsFixed(3)} fps',
+      ));
+    }
+    return info;
+  }
+
   Future<void> _play() async {
     final item = _item;
     if (item == null || _playing) return;
@@ -70,10 +89,7 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final url = await _client.fetchPlaybackUrl(item.id);
-      final launched = await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-      );
+      final launched = await const VideoPlayerLauncher().launch(url);
       if (!launched && mounted) {
         messenger.showSnackBar(
           const SnackBar(content: Text('未找到可播放的应用')),
@@ -162,6 +178,8 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
   Widget _buildAppBar(JellyfinItem item) {
     final backdrop = item.backdropImageTag != null
         ? _client.backdropUrl(item.id, tag: item.backdropImageTag, maxWidth: 1600)
+        : item.primaryImageTag != null
+        ? _client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1600)
         : null;
     return SliverAppBar(
       expandedHeight: 300,
@@ -314,6 +332,26 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
                 onPressed: () => setState(() => _expanded = !_expanded),
                 child: Text(_expanded ? '收起' : '展开'),
               ),
+          ],
+          if (_mediaInfo.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            const Text(
+              '媒体信息',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final info in _mediaInfo)
+                  _InfoChip(icon: info.$1, label: info.$2),
+              ],
+            ),
           ],
           if (_people.isNotEmpty) ...[
             const SizedBox(height: 18),

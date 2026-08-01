@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:m3u8downloader/src/jellyfin_client.dart';
 import 'package:m3u8downloader/src/jellyfin_home_view.dart';
+import 'package:m3u8downloader/src/jellyfin_library_view.dart';
 import 'package:m3u8downloader/src/server_settings.dart';
 
 const _jsonHeaders = {'content-type': 'application/json'};
@@ -80,6 +81,14 @@ MockClient _homeMock() => MockClient((request) async {
     return _ok(<Object>[]);
   }
   if (path.endsWith('/Items')) {
+    if (query['StartIndex'] != null) {
+      return _ok({
+        'Items': [
+          {'Id': 'l1', 'Type': 'Movie', 'Name': '库内电影1', 'ImageTags': {'Primary': 'lp1'}},
+          {'Id': 'l2', 'Type': 'Movie', 'Name': '库内电影2'},
+        ],
+      });
+    }
     if (query['ParentId'] == 'v1') return _ok({'TotalRecordCount': 128});
     return _ok({'TotalRecordCount': 45});
   }
@@ -115,6 +124,88 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('carousel falls back to primary image when no backdrop', (
+    tester,
+  ) async {
+    final client = _client(
+      MockClient((request) async {
+        final path = request.url.path;
+        if (path.endsWith('/Views')) {
+          return _ok({
+            'Items': [
+              {
+                'Id': 'v1',
+                'Name': '电影',
+                'CollectionType': 'movies',
+                'ImageTags': {'Primary': 'vt1'},
+              },
+            ],
+          });
+        }
+        if (path.endsWith('/Items/Resume')) {
+          return _ok({'Items': <Object>[]});
+        }
+        if (path.contains('/Items/Latest')) {
+          return _ok([
+            {
+              'Id': 'm1',
+              'Type': 'Movie',
+              'Name': '无横幅电影',
+              'ProductionYear': 2025,
+              'ImageTags': {'Primary': 'p1'},
+            },
+          ]);
+        }
+        if (path.endsWith('/Items')) return _ok({'TotalRecordCount': 12});
+        return http.Response('not found', 404);
+      }),
+    );
+    await _pumpHome(tester, client);
+
+    final carouselImages = tester
+        .widgetList<Image>(
+          find.descendant(
+            of: find.byType(PageView),
+            matching: find.byType(Image),
+          ),
+        )
+        .toList();
+    expect(carouselImages, isNotEmpty);
+    for (final image in carouselImages) {
+      expect(
+        (image.image as NetworkImage).url,
+        contains('/Items/m1/Images/Primary'),
+      );
+    }
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('library card shows the library cover image', (tester) async {
+    await _pumpHome(tester, _client(_homeMock()));
+
+    final urls = tester
+        .widgetList<Image>(find.byType(Image))
+        .map((image) => (image.image as NetworkImage).url)
+        .toList();
+    expect(
+      urls,
+      contains(contains('/Items/v1/Images/Primary')),
+    );
+  });
+
+  testWidgets('tapping a library card opens its library list', (tester) async {
+    await _pumpHome(tester, _client(_homeMock()));
+
+    await tester.tap(find.text('电影'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(JellyfinLibraryView), findsOneWidget);
+    expect(find.text('库内电影1'), findsOneWidget);
+    expect(find.text('库内电影2'), findsOneWidget);
   });
 
   testWidgets('empty server shows friendly message', (tester) async {

@@ -34,16 +34,6 @@ class _FakeLauncher extends UrlLauncherPlatform {
 JellyfinClient _detailClient() => JellyfinClient(
   httpClient: MockClient((request) async {
     final path = request.url.path;
-    if (path.endsWith('/Items/d1/People')) {
-      return _ok([
-        {
-          'Id': 'p1',
-          'Name': '克里斯托弗·诺兰',
-          'Role': '导演',
-        },
-        {'Id': 'p2', 'Name': '马修·麦康纳', 'Role': '演员'},
-      ]);
-    }
     if (path.endsWith('/Items/d1/PlaybackInfo')) {
       return _ok({
         'MediaSources': [
@@ -62,6 +52,24 @@ JellyfinClient _detailClient() => JellyfinClient(
       'Overview': '一段跨越时空的旅程。',
       'ImageTags': {'Primary': 'p1'},
       'BackdropImageTags': ['b1'],
+      'MediaSources': [
+        {
+          'MediaStreams': [
+            {
+              'Type': 'Video',
+              'Codec': 'h264',
+              'Width': 1920,
+              'Height': 1080,
+              'FrameRate': 23.976,
+            },
+            {'Type': 'Audio', 'Codec': 'aac'},
+          ],
+        },
+      ],
+      'People': [
+        {'Id': 'p1', 'Name': '克里斯托弗·诺兰', 'Role': '导演'},
+        {'Id': 'p2', 'Name': '马修·麦康纳', 'Role': '演员'},
+      ],
     });
   }),
   baseUrl: 'http://192.168.1.10:8096',
@@ -95,12 +103,17 @@ void main() {
     expect(find.text('一段跨越时空的旅程。'), findsOneWidget);
     expect(find.text('克里斯托弗·诺兰'), findsOneWidget);
     expect(find.text('导演'), findsOneWidget);
+    expect(find.text('媒体信息'), findsOneWidget);
+    expect(find.text('1920x1080'), findsOneWidget);
+    expect(find.text('h264'), findsOneWidget);
+    expect(find.text('aac'), findsOneWidget);
+    expect(find.text('23.976 fps'), findsOneWidget);
 
     await tester.tap(find.text('播放'));
     await tester.pumpAndSettle();
 
     expect(launcher.launchedUrl, isNotNull);
-    expect(launcher.launchedUrl, contains('master.m3u8'));
+    expect(launcher.launchedUrl, contains('stream.mp4'));
     expect(tester.takeException(), isNull);
   });
 
@@ -145,15 +158,6 @@ void main() {
         if (path.endsWith('/Items/d1/PlaybackInfo')) {
           return http.Response('', 401);
         }
-        if (path.endsWith('/Items/d1/People')) {
-          return _ok([
-            {
-              'Id': 'p1',
-              'Name': '克里斯托弗·诺兰',
-              'Role': '导演',
-            },
-          ]);
-        }
         return _ok({
           'Id': 'd1',
           'Type': 'Movie',
@@ -165,6 +169,9 @@ void main() {
           'Overview': '一段跨越时空的旅程。',
           'ImageTags': {'Primary': 'p1'},
           'BackdropImageTags': ['b1'],
+          'People': [
+            {'Id': 'p1', 'Name': '克里斯托弗·诺兰', 'Role': '导演'},
+          ],
         });
       }),
       baseUrl: 'http://192.168.1.10:8096',

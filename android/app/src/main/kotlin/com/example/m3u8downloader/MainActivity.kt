@@ -133,6 +133,60 @@ class MainActivity : FlutterActivity() {
                         result.error("open_failed", error.message ?: "无法打开视频", null)
                     }
                 }
+                "playVideo" -> {
+                    val url = call.argument<String>("url").orEmpty()
+                    val playerPackage = call.argument<String>("package").orEmpty()
+                    if (url.isBlank()) {
+                        result.error("invalid_arguments", "播放地址不能为空", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            if (playerPackage == "is.xyz.mpv") {
+                                setDataAndType(Uri.parse(url), "video/any")
+                            } else {
+                                setDataAndType(Uri.parse(url), "video/*")
+                            }
+                            if (playerPackage.isNotBlank()) setPackage(playerPackage)
+                        }
+                        if (intent.resolveActivity(packageManager) == null) {
+                            result.error("no_player", "系统中没有可播放此视频的应用", null)
+                            return@setMethodCallHandler
+                        }
+                        startActivity(intent)
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("play_failed", error.message ?: "无法播放", null)
+                    }
+                }
+                "playInApp" -> {
+                    val url = call.argument<String>("url").orEmpty()
+                    if (url.isBlank()) {
+                        result.error("invalid_arguments", "播放地址不能为空", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        startActivity(PlayerActivity.newIntent(this, url))
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("play_failed", error.message ?: "无法播放", null)
+                    }
+                }
+                "queryVideoPlayers" -> {
+                    val url = call.argument<String>("url").orEmpty()
+                    val players = KNOWN_VIDEO_PLAYERS.mapNotNull { (pkg, label, mime) ->
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(Uri.parse(url), mime)
+                            setPackage(pkg)
+                        }
+                        if (intent.resolveActivity(packageManager) != null) {
+                            mapOf("package" to pkg, "label" to label)
+                        } else {
+                            null
+                        }
+                    }
+                    result.success(players)
+                }
                 "getVideoThumbnail" -> {
                     val fileName = call.argument<String>("fileName").orEmpty()
                     val contentUri = call.argument<String>("contentUri").orEmpty()
@@ -363,5 +417,10 @@ class MainActivity : FlutterActivity() {
         private const val THUMBNAIL_WIDTH = 320
         private const val THUMBNAIL_HEIGHT = 180
         private val ASYNC_RESULT = Any()
+        private val KNOWN_VIDEO_PLAYERS = listOf(
+            Triple("org.videolan.vlc", "VLC", "video/*"),
+            Triple("is.xyz.mpv", "MPV", "video/any"),
+            Triple("com.mxtech.videoplayer.ad", "MX Player", "video/*"),
+        )
     }
 }

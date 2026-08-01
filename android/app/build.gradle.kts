@@ -71,4 +71,6 @@ flutter {
 dependencies {
     implementation("eu.agno3.jcifs:jcifs-ng:2.1.10")
     implementation("org.slf4j:slf4j-nop:1.7.30")
+    implementation("androidx.media3:media3-exoplayer:1.10.1")
+    implementation("androidx.media3:media3-ui:1.10.1")
 }

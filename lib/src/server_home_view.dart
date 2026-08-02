@@ -40,7 +40,10 @@ class _ServerHomeViewState extends State<ServerHomeView> {
     });
   }
 
-  Future<void> _openSheet({ServerConfig? initial}) async {
+  Future<void> _openSheet({
+    ServerConfig? initial,
+    bool openAfterSave = true,
+  }) async {
     final result = await showModalBottomSheet<ServerConfig>(
       context: context,
       isScrollControlled: true,
@@ -55,7 +58,7 @@ class _ServerHomeViewState extends State<ServerHomeView> {
       context,
     ).showSnackBar(SnackBar(content: Text('已连接 ${result.name}')));
     await _reload();
-    if (!mounted) return;
+    if (!openAfterSave || !mounted) return;
     final client = _clientFactory()
       ..configure(
         baseUrl: result.url,
@@ -151,6 +154,8 @@ class _ServerHomeViewState extends State<ServerHomeView> {
                 _ServerCard(
                   server: server,
                   onTap: () => _openServer(server),
+                  onEdit: () =>
+                      _openSheet(initial: server, openAfterSave: false),
                   onDelete: () => _deleteServer(server),
                 ),
                 const SizedBox(height: 12),
@@ -207,12 +212,62 @@ class _ServerCard extends StatelessWidget {
   const _ServerCard({
     required this.server,
     required this.onTap,
+    required this.onEdit,
     required this.onDelete,
   });
 
   final ServerConfig server;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
+
+  Future<void> _showMenu(BuildContext context, Offset pressPosition) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(pressPosition.dx, pressPosition.dy, 1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.edit_outlined, size: 20),
+              const SizedBox(width: 12),
+              const Text('编辑'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(
+                Icons.delete_outline,
+                size: 20,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '删除',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    switch (action) {
+      case 'edit':
+        onEdit();
+      case 'delete':
+        onDelete();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -220,74 +275,73 @@ class _ServerCard extends StatelessWidget {
     return AppSurface(
       borderRadius: 22,
       elevated: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
-          child: Row(
-            children: [
-              _ProtocolBadge(type: server.type),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            server.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                        if (!server.hasToken) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colors.tertiaryContainer,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+      child: GestureDetector(
+        onLongPressStart: (details) =>
+            _showMenu(context, details.globalPosition),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Row(
+              children: [
+                _ProtocolBadge(type: server.type),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
                             child: Text(
-                              '需重新连接',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: colors.onTertiaryContainer,
+                              server.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
                               ),
                             ),
                           ),
+                          if (!server.hasToken) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.tertiaryContainer,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '需重新连接',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.onTertiaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      server.url.replaceAll(RegExp(r'^https?://'), ''),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colors.onSurfaceVariant,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 3),
+                      Text(
+                        server.url.replaceAll(RegExp(r'^https?://'), ''),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                tooltip: '删除',
-                onPressed: onDelete,
-                icon: Icon(Icons.delete_outline, color: colors.outline),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

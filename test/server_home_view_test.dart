@@ -125,8 +125,12 @@ void main() {
 
     expect(find.text('家庭影院'), findsOneWidget);
     expect(find.text('192.168.1.10:8096'), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.delete_outline));
+    await tester.longPress(find.text('家庭影院'));
+    await tester.pumpAndSettle();
+    expect(find.text('编辑'), findsOneWidget);
+    await tester.tap(find.text('删除'));
     await tester.pumpAndSettle();
     expect(find.text('删除服务器「家庭影院」？'), findsOneWidget);
     await tester.tap(find.text('删除'));
@@ -134,6 +138,35 @@ void main() {
 
     expect(find.text('添加你的第一个服务器'), findsOneWidget);
     expect(await store.loadAll(), isEmpty);
+  });
+
+  testWidgets('long press menu opens edit sheet pre-filled', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = _store();
+    await store.save(
+      ServerConfig(
+        id: 'srv-1',
+        type: ServerType.jellyfin,
+        name: '家庭影院',
+        url: 'http://192.168.1.10:8096',
+        accessToken: 'tok',
+        createdAt: DateTime.parse('2026-08-02T10:00:00'),
+      ),
+    );
+    await _pumpServerView(tester, store: store);
+
+    await tester.longPress(find.text('家庭影院'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('编辑'));
+    await tester.pumpAndSettle();
+
+    final fieldTexts = tester
+        .widgetList<TextField>(find.byType(TextField))
+        .map((f) => f.controller!.text)
+        .toList();
+    expect(fieldTexts, contains('家庭影院'));
+    expect(fieldTexts, contains('http://192.168.1.10:8096'));
+    expect(await store.loadAll(), hasLength(1));
   });
 
   testWidgets('server without token shows reconnect badge', (tester) async {

@@ -32,11 +32,14 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
   Map<String, List<JellyfinItem>> _latest = {};
   Map<String, int?> _viewCounts = {};
   List<JellyfinItem> _carousel = [];
+  bool _contentReady = false;
 
   final _carouselController = PageController();
   Timer? _carouselTimer;
   bool _carouselDragging = false;
   int _carouselIndex = 0;
+
+  Animation<double>? _routeAnimation;
 
   JellyfinClient get _client => widget.client;
 
@@ -47,10 +50,35 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_routeAnimation == null) {
+      final animation = ModalRoute.of(context)?.animation;
+      if (animation != null) {
+        _routeAnimation = animation;
+        if (animation.status == AnimationStatus.completed) {
+          _contentReady = true;
+        } else {
+          animation.addStatusListener(_onRouteStatus);
+        }
+      } else {
+        _contentReady = true;
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
     _carouselTimer?.cancel();
     _carouselController.dispose();
     super.dispose();
+  }
+
+  void _onRouteStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && !_contentReady) {
+      setState(() => _contentReady = true);
+    }
   }
 
   Future<void> _load({bool refresh = false}) async {
@@ -116,66 +144,42 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
 
   Future<void> _precacheImages() async {
     if (!mounted) return;
-    final requests = <Future<void>>[
+    final urls = <String>{
       for (final item in _carousel)
         if (item.backdropImageTag != null)
-          precacheImage(
-            NetworkImage(
-              _client.backdropUrl(
-                item.id,
-                tag: item.backdropImageTag,
-                maxWidth: 1000,
-              ),
-            ),
-            context,
-            onError: (_, _) {},
-          ),
-      for (final view in _views)
-        if (view.primaryImageTag != null)
-          precacheImage(
-            NetworkImage(
-              _client.imageUrl(
-                view.id,
-                tag: view.primaryImageTag,
-                maxWidth: 300,
-              ),
-            ),
-            context,
-            onError: (_, _) {},
+          _client.backdropUrl(
+            item.id,
+            tag: item.backdropImageTag,
+            maxWidth: 1000,
           ),
       for (final item in _resume)
-        if (item.primaryImageTag != null)
-          precacheImage(
-            NetworkImage(
-              _client.imageUrl(
-                item.id,
-                tag: item.primaryImageTag,
-                maxWidth: 480,
-              ),
-            ),
-            context,
-            onError: (_, _) {},
+        if (item.backdropImageTag != null)
+          _client.backdropUrl(
+            item.id,
+            tag: item.backdropImageTag,
+            maxWidth: 1000,
           ),
       for (final list in _latest.values)
-        for (final item in list.take(4))
-          if (item.primaryImageTag != null)
-            precacheImage(
-              NetworkImage(
-                _client.imageUrl(
-                  item.id,
-                  tag: item.primaryImageTag,
-                  maxWidth: 300,
-                ),
-              ),
-              context,
-              onError: (_, _) {},
+        for (final item in list)
+          if (item.backdropImageTag != null)
+            _client.backdropUrl(
+              item.id,
+              tag: item.backdropImageTag,
+              maxWidth: 1000,
             ),
-    ];
-    for (var i = 0; i < requests.length; i += 8) {
-      final end = (i + 8).clamp(0, requests.length);
+    }.toList();
+    for (var i = 0; i < urls.length; i += 8) {
+      final end = (i + 8).clamp(0, urls.length);
       try {
-        await Future.wait(requests.sublist(i, end));
+        await Future.wait([
+          for (final url in urls.sublist(i, end))
+            precacheImage(NetworkImage(url), context, onError: (_, _) {}),
+        ]);
       } catch (_) {}
+      if (!mounted) return;
+      if (end >= urls.length) return;
+      await Future.delayed(const Duration(milliseconds: 150));
+      if (!mounted) return;
     }
   }
 
@@ -276,8 +280,17 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
         ),
         child: Scaffold(
           backgroundColor: jellyfinBackground,
-          body: _loading
-              ? const Center(child: CircularProgressIndicator())
+          body: _loading || !_contentReady
+              ? const Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    JellyfinEffectWarmup(),
+                    ColoredBox(
+                      color: jellyfinBackground,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ],
+                )
               : _error != null
               ? _ErrorView(message: _error!, onRetry: _load)
               : RefreshIndicator(

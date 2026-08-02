@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -113,6 +114,48 @@ Future<void> _pumpHome(WidgetTester tester, JellyfinClient client) async {
 }
 
 void main() {
+  testWidgets('keeps the loading indicator until data arrives', (tester) async {
+    final gate = Completer<void>();
+    final client = _client(
+      MockClient((request) async {
+        await gate.future;
+        final path = request.url.path;
+        if (path.endsWith('/Views')) {
+          return _ok({
+            'Items': [
+              {
+                'Id': 'v1',
+                'Name': '电影',
+                'CollectionType': 'movies',
+                'ImageTags': {'Primary': 'vt1'},
+              },
+            ],
+          });
+        }
+        if (path.endsWith('/Items/Resume')) {
+          return _ok({'Items': <Object>[]});
+        }
+        if (path.contains('/Items/Latest')) return _ok(<Object>[]);
+        if (path.endsWith('/Items')) return _ok({'TotalRecordCount': 0});
+        return http.Response('not found', 404);
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: JellyfinHomeView(config: _config(), client: client),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('电影'), findsOneWidget);
+  });
+
   testWidgets('home renders carousel, resume, libraries and latest', (
     tester,
   ) async {

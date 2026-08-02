@@ -28,6 +28,9 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
   String? _error;
   bool _expanded = false;
   bool _playing = false;
+  bool _transitionDone = false;
+
+  Animation<double>? _routeAnimation;
 
   JellyfinClient get _client => widget.client;
 
@@ -35,6 +38,36 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_routeAnimation == null) {
+      final animation = ModalRoute.of(context)?.animation;
+      if (animation != null) {
+        _routeAnimation = animation;
+        if (animation.status == AnimationStatus.completed) {
+          _transitionDone = true;
+        } else {
+          animation.addStatusListener(_onRouteStatus);
+        }
+      } else {
+        _transitionDone = true;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
+    super.dispose();
+  }
+
+  void _onRouteStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && !_transitionDone) {
+      setState(() => _transitionDone = true);
+    }
   }
 
   Future<void> _load() async {
@@ -150,6 +183,8 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
               ? _DetailErrorView(message: _error!, onRetry: _load)
               : item == null
               ? const SizedBox.shrink()
+              : !_transitionDone
+              ? const Center(child: CircularProgressIndicator())
               : Stack(
                   children: [
                     CustomScrollView(
@@ -229,7 +264,7 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            if (backdrop != null)
+            if (backdrop != null && _transitionDone)
               Image.network(
                 backdrop,
                 fit: BoxFit.cover,

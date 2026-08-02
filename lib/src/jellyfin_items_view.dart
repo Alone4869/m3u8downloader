@@ -28,7 +28,10 @@ class _JellyfinItemsViewState extends State<JellyfinItemsView> {
   bool _loading = true;
   bool _loadingMore = false;
   bool _endReached = false;
+  bool _contentReady = false;
   String? _error;
+
+  Animation<double>? _routeAnimation;
 
   JellyfinClient get _client => widget.client;
 
@@ -40,9 +43,34 @@ class _JellyfinItemsViewState extends State<JellyfinItemsView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_routeAnimation == null) {
+      final animation = ModalRoute.of(context)?.animation;
+      if (animation != null) {
+        _routeAnimation = animation;
+        if (animation.status == AnimationStatus.completed) {
+          _contentReady = true;
+        } else {
+          animation.addStatusListener(_onRouteStatus);
+        }
+      } else {
+        _contentReady = true;
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onRouteStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && !_contentReady) {
+      setState(() => _contentReady = true);
+    }
   }
 
   void _onScroll() {
@@ -133,7 +161,7 @@ class _JellyfinItemsViewState extends State<JellyfinItemsView> {
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
-        body: _loading
+        body: _loading || !_contentReady
             ? const Center(child: CircularProgressIndicator())
             : _error != null
             ? _LibraryErrorView(message: _error!, onRetry: _load)
@@ -161,6 +189,7 @@ class _JellyfinItemsViewState extends State<JellyfinItemsView> {
                             item: item,
                             client: _client,
                             onTap: () => _openDetail(item),
+                            deferIndex: index,
                           );
                         }, childCount: _items.length),
                       ),
@@ -186,21 +215,57 @@ class _JellyfinItemsViewState extends State<JellyfinItemsView> {
   }
 }
 
-class _LibraryPosterCard extends StatelessWidget {
+class _LibraryPosterCard extends StatefulWidget {
   const _LibraryPosterCard({
     required this.item,
     required this.client,
     required this.onTap,
+    required this.deferIndex,
   });
 
   final JellyfinItem item;
   final JellyfinClient client;
   final VoidCallback onTap;
+  final int deferIndex;
+
+  @override
+  State<_LibraryPosterCard> createState() => _LibraryPosterCardState();
+}
+
+class _LibraryPosterCardState extends State<_LibraryPosterCard> {
+  bool _showImage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startImage();
+  }
+
+  Future<void> _startImage() async {
+    final item = widget.item;
+    final tag = item.primaryImageTag;
+    if (tag == null) return;
+    final url = widget.client.imageUrl(item.id, tag: tag, maxWidth: 300);
+    final status = PaintingBinding.instance.imageCache.statusForKey(
+      NetworkImage(url),
+    );
+    if (status.keepAlive || status.pending) {
+      if (mounted) setState(() => _showImage = true);
+      return;
+    }
+    if (widget.deferIndex > 0) {
+      await Future.delayed(
+        Duration(milliseconds: widget.deferIndex.clamp(0, 12) * 40),
+      );
+      if (!mounted) return;
+    }
+    setState(() => _showImage = true);
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -208,11 +273,11 @@ class _LibraryPosterCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: SizedBox.expand(
-                child: item.primaryImageTag != null
+                child: widget.item.primaryImageTag != null && _showImage
                     ? Image.network(
-                        client.imageUrl(
-                          item.id,
-                          tag: item.primaryImageTag,
+                        widget.client.imageUrl(
+                          widget.item.id,
+                          tag: widget.item.primaryImageTag,
                           maxWidth: 300,
                         ),
                         fit: BoxFit.cover,
@@ -233,7 +298,7 @@ class _LibraryPosterCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            item.name,
+            widget.item.name,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white, fontSize: 13),

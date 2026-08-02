@@ -205,10 +205,10 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
         ? _client.backdropUrl(
             item.id,
             tag: item.backdropImageTag,
-            maxWidth: 1600,
+            maxWidth: 1000,
           )
         : item.primaryImageTag != null
-        ? _client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1600)
+        ? _client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1000)
         : null;
     return SliverAppBar(
       expandedHeight: jellyfinHeaderHeight,

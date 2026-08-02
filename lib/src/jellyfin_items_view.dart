@@ -216,6 +216,15 @@ class _LibraryPosterCard extends StatelessWidget {
                           maxWidth: 300,
                         ),
                         fit: BoxFit.cover,
+                        frameBuilder: (context, child, frame, wasSync) {
+                          if (wasSync) return child;
+                          return AnimatedOpacity(
+                            opacity: frame == null ? 0 : 1,
+                            duration: const Duration(milliseconds: 120),
+                            curve: Curves.easeOut,
+                            child: child,
+                          );
+                        },
                         errorBuilder: (_, _, _) => const _PosterPlaceholder(),
                       )
                     : const _PosterPlaceholder(),

@@ -93,6 +93,7 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
         _loading = false;
       });
       _startCarouselTimer();
+      _precacheImages();
     } catch (error) {
       if (!mounted) return;
       if (error is JellyfinException && error.statusCode == 401) {
@@ -110,6 +111,71 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
           _loading = false;
         });
       }
+    }
+  }
+
+  Future<void> _precacheImages() async {
+    if (!mounted) return;
+    final requests = <Future<void>>[
+      for (final item in _carousel)
+        if (item.backdropImageTag != null)
+          precacheImage(
+            NetworkImage(
+              _client.backdropUrl(
+                item.id,
+                tag: item.backdropImageTag,
+                maxWidth: 1000,
+              ),
+            ),
+            context,
+            onError: (_, _) {},
+          ),
+      for (final view in _views)
+        if (view.primaryImageTag != null)
+          precacheImage(
+            NetworkImage(
+              _client.imageUrl(
+                view.id,
+                tag: view.primaryImageTag,
+                maxWidth: 300,
+              ),
+            ),
+            context,
+            onError: (_, _) {},
+          ),
+      for (final item in _resume)
+        if (item.primaryImageTag != null)
+          precacheImage(
+            NetworkImage(
+              _client.imageUrl(
+                item.id,
+                tag: item.primaryImageTag,
+                maxWidth: 480,
+              ),
+            ),
+            context,
+            onError: (_, _) {},
+          ),
+      for (final list in _latest.values)
+        for (final item in list.take(4))
+          if (item.primaryImageTag != null)
+            precacheImage(
+              NetworkImage(
+                _client.imageUrl(
+                  item.id,
+                  tag: item.primaryImageTag,
+                  maxWidth: 300,
+                ),
+              ),
+              context,
+              onError: (_, _) {},
+            ),
+    ];
+    for (var i = 0; i < requests.length; i += 8) {
+      final end = (i + 8).clamp(0, requests.length);
+      try {
+        await Future.wait(requests.sublist(i, end));
+      } catch (_) {}
     }
   }
 
@@ -395,10 +461,10 @@ class _CarouselItem extends StatelessWidget {
         ? client.backdropUrl(
             item.id,
             tag: item.backdropImageTag,
-            maxWidth: 1600,
+            maxWidth: 1000,
           )
         : item.primaryImageTag != null
-        ? client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1600)
+        ? client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1000)
         : null;
     return GestureDetector(
       onTap: onOpen,

@@ -40,6 +40,7 @@ dependencies:
   url_launcher: ^6.3.0
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^10.3.1
+  flutter_svg: ^2.0.17
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +69,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/logos/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

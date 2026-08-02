@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'jellyfin_client.dart';
 import 'jellyfin_detail_view.dart';
@@ -166,7 +167,7 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
   void _openDetail(JellyfinItem item) {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      jellyfinRoute(
         builder: (_) => JellyfinDetailView(itemId: item.id, client: _client),
       ),
     ).then((result) {
@@ -179,7 +180,7 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
   void _openLibrary(JellyfinView view) {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      jellyfinRoute(
         builder: (_) => JellyfinLibraryView(view: view, client: _client),
       ),
     ).then((result) {
@@ -193,11 +194,15 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
   Widget build(BuildContext context) {
     return Theme(
       data: jellyfinCinemaTheme(),
-      child: Scaffold(
-        backgroundColor: jellyfinBackground,
-        body: SafeArea(
-          bottom: false,
-          child: _loading
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
+        child: Scaffold(
+          backgroundColor: jellyfinBackground,
+          body: _loading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
               ? _ErrorView(message: _error!, onRetry: _load)
@@ -239,7 +244,7 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
   Widget _buildCarousel() {
     if (_carousel.isEmpty) return const SizedBox.shrink();
     return SizedBox(
-      height: MediaQuery.sizeOf(context).width * 0.78,
+      height: jellyfinHeaderHeight,
       child: Stack(
         children: [
           NotificationListener<ScrollNotification>(

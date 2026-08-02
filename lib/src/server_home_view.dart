@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'glass_surface.dart';
 import 'jellyfin_client.dart';
 import 'jellyfin_home_view.dart';
+import 'jellyfin_theme.dart';
 import 'server_settings.dart';
 
 class ServerHomeView extends StatefulWidget {
@@ -62,7 +64,7 @@ class _ServerHomeViewState extends State<ServerHomeView> {
       );
     final tokenExpired = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
+      jellyfinRoute<bool>(
         builder: (_) => JellyfinHomeView(config: result, client: client),
       ),
     );
@@ -89,7 +91,7 @@ class _ServerHomeViewState extends State<ServerHomeView> {
       );
     final tokenExpired = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
+      jellyfinRoute<bool>(
         builder: (_) => JellyfinHomeView(config: server, client: client),
       ),
     );
@@ -300,13 +302,10 @@ class _ProtocolBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (color, icon) = switch (type) {
-      ServerType.jellyfin => (
-        const Color(0xFF00A4DC),
-        Icons.play_arrow_rounded,
-      ),
-      ServerType.emby => (const Color(0xFF52B54B), Icons.live_tv_rounded),
-      ServerType.smb => (const Color(0xFFF59E0B), Icons.folder_rounded),
+    final color = switch (type) {
+      ServerType.jellyfin => const Color(0xFF17171C),
+      ServerType.emby => const Color(0xFF17171C),
+      ServerType.smb => const Color(0xFFF59E0B),
     };
     return Container(
       width: 50,
@@ -322,7 +321,24 @@ class _ProtocolBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(icon, color: Colors.white, size: 27),
+      child: switch (type) {
+        ServerType.jellyfin => Padding(
+          padding: const EdgeInsets.all(11),
+          child: SvgPicture.asset(
+            'assets/logos/jellyfin.svg',
+            fit: BoxFit.contain,
+          ),
+        ),
+        ServerType.emby => Padding(
+          padding: const EdgeInsets.all(11),
+          child: SvgPicture.asset('assets/logos/emby.svg', fit: BoxFit.contain),
+        ),
+        ServerType.smb => const Icon(
+          Icons.folder_rounded,
+          color: Colors.white,
+          size: 27,
+        ),
+      },
     );
   }
 }

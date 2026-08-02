@@ -115,7 +115,7 @@ class _JellyfinLibraryViewState extends State<JellyfinLibraryView> {
   void _openDetail(JellyfinItem item) {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      jellyfinRoute(
         builder: (_) => JellyfinDetailView(itemId: item.id, client: _client),
       ),
     ).then((result) {

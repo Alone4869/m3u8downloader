@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'jellyfin_client.dart';
 import 'jellyfin_theme.dart';
@@ -116,59 +117,66 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
     final item = _item;
     return Theme(
       data: jellyfinCinemaTheme(),
-      child: Scaffold(
-        backgroundColor: jellyfinBackground,
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-            ? _DetailErrorView(message: _error!, onRetry: _load)
-            : item == null
-            ? const SizedBox.shrink()
-            : Stack(
-                children: [
-                  CustomScrollView(
-                    slivers: [
-                      _buildAppBar(item),
-                      SliverToBoxAdapter(child: _buildBody(item)),
-                    ],
-                  ),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 20,
-                    child: SafeArea(
-                      top: false,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
+        child: Scaffold(
+          backgroundColor: jellyfinBackground,
+          body: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? _DetailErrorView(message: _error!, onRetry: _load)
+              : item == null
+              ? const SizedBox.shrink()
+              : Stack(
+                  children: [
+                    CustomScrollView(
+                      slivers: [
+                        _buildAppBar(item),
+                        SliverToBoxAdapter(child: _buildBody(item)),
+                      ],
+                    ),
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 20,
+                      child: SafeArea(
+                        top: false,
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            minimumSize: const Size.fromHeight(52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
-                        ),
-                        onPressed: _playing ? null : _play,
-                        icon: _playing
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.black,
-                                ),
-                              )
-                            : const Icon(Icons.play_arrow_rounded),
-                        label: Text(
-                          _playing ? '正在获取播放地址…' : '播放',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
+                          onPressed: _playing ? null : _play,
+                          icon: _playing
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.black,
+                                  ),
+                                )
+                              : const Icon(Icons.play_arrow_rounded),
+                          label: Text(
+                            _playing ? '正在获取播放地址…' : '播放',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -184,7 +192,7 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
         ? _client.imageUrl(item.id, tag: item.primaryImageTag, maxWidth: 1600)
         : null;
     return SliverAppBar(
-      expandedHeight: 300,
+      expandedHeight: jellyfinHeaderHeight,
       pinned: true,
       backgroundColor: jellyfinBackground,
       foregroundColor: Colors.white,

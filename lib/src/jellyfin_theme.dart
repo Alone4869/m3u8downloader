@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 const jellyfinBackground = Color(0xFF0B0B0F);
 const jellyfinAccent = Color(0xFF00A4DC);
+const jellyfinHeaderHeight = 300.0;
 
 ThemeData jellyfinCinemaTheme() {
   final scheme = ColorScheme.fromSeed(
@@ -19,6 +20,37 @@ ThemeData jellyfinCinemaTheme() {
       elevation: 0,
       scrolledUnderElevation: 0,
     ),
+  );
+}
+
+Route<T> jellyfinRoute<T>({required WidgetBuilder builder}) {
+  return PageRouteBuilder<T>(
+    pageBuilder: (context, animation, secondaryAnimation) => builder(context),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final incoming = CurvedAnimation(
+        parent: animation,
+        curve: Curves.fastEaseInToSlowEaseOut,
+        reverseCurve: Curves.fastEaseInToSlowEaseOut.flipped,
+      );
+      final outgoing = CurvedAnimation(
+        parent: secondaryAnimation,
+        curve: Curves.linearToEaseOut,
+        reverseCurve: Curves.easeInToLinear,
+      );
+      return SlideTransition(
+        position: outgoing.drive(
+          Tween<Offset>(begin: Offset.zero, end: const Offset(-1 / 3, 0)),
+        ),
+        child: SlideTransition(
+          position: incoming.drive(
+            Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero),
+          ),
+          child: child,
+        ),
+      );
+    },
+    transitionDuration: const Duration(milliseconds: 500),
+    reverseTransitionDuration: const Duration(milliseconds: 500),
   );
 }
 

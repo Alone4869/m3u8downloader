@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 const jellyfinDeviceId = 'm3u8-downloader-2026';
 const jellyfinDeviceName = 'M3U8 Downloader';
-const jellyfinClientVersion = '1.3.4';
+const jellyfinClientVersion = '1.3.5';
 
 class JellyfinException implements Exception {
   const JellyfinException(this.message, {this.statusCode});

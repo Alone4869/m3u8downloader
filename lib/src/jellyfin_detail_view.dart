@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'jellyfin_client.dart';
+import 'jellyfin_items_view.dart';
 import 'jellyfin_theme.dart';
 import 'video_player_launcher.dart';
 
@@ -110,6 +111,24 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
     } finally {
       if (mounted) setState(() => _playing = false);
     }
+  }
+
+  void _openWorks({
+    required String title,
+    required Future<List<JellyfinItem>> Function(int limit, int startIndex)
+    loader,
+  }) {
+    Navigator.push(
+      context,
+      jellyfinRoute(
+        builder: (_) =>
+            JellyfinItemsView(title: title, client: _client, loadPage: loader),
+      ),
+    ).then((result) {
+      if (result == 'expired' && mounted) {
+        Navigator.pop(context, 'expired');
+      }
+    });
   }
 
   @override
@@ -311,7 +330,20 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [for (final genre in item.genres) _GenreChip(genre)],
+              children: [
+                for (final genre in item.genres)
+                  _GenreChip(
+                    label: genre,
+                    onTap: () => _openWorks(
+                      title: genre,
+                      loader: (limit, startIndex) => _client.fetchGenreWorks(
+                        genre,
+                        limit: limit,
+                        startIndex: startIndex,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
           if (item.overview.isNotEmpty) ...[
@@ -378,8 +410,21 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
                 scrollDirection: Axis.horizontal,
                 itemCount: _people.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (context, index) =>
-                    _PersonCard(person: _people[index], client: _client),
+                itemBuilder: (context, index) {
+                  final person = _people[index];
+                  return _PersonCard(
+                    person: person,
+                    client: _client,
+                    onTap: () => _openWorks(
+                      title: person.name,
+                      loader: (limit, startIndex) => _client.fetchPersonWorks(
+                        person.id,
+                        limit: limit,
+                        startIndex: startIndex,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -390,47 +435,55 @@ class _JellyfinDetailViewState extends State<JellyfinDetailView> {
 }
 
 class _PersonCard extends StatelessWidget {
-  const _PersonCard({required this.person, required this.client});
+  const _PersonCard({
+    required this.person,
+    required this.client,
+    required this.onTap,
+  });
 
   final JellyfinPerson person;
   final JellyfinClient client;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final image = person.imageTag != null
         ? client.imageUrl(person.id, tag: person.imageTag, maxWidth: 200)
         : null;
-    return SizedBox(
-      width: 76,
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: const Color(0xFF1D1D24),
-            foregroundImage: image != null ? NetworkImage(image) : null,
-            child: const Icon(Icons.person_rounded, color: Colors.white38),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            person.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 76,
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 32,
+              backgroundColor: const Color(0xFF1D1D24),
+              foregroundImage: image != null ? NetworkImage(image) : null,
+              child: const Icon(Icons.person_rounded, color: Colors.white38),
             ),
-          ),
-          if (person.role.isNotEmpty)
+            const SizedBox(height: 6),
             Text(
-              person.role,
+              person.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white54, fontSize: 11),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-        ],
+            if (person.role.isNotEmpty)
+              Text(
+                person.role,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -471,25 +524,29 @@ class _InfoChip extends StatelessWidget {
 }
 
 class _GenreChip extends StatelessWidget {
-  const _GenreChip(this.label);
+  const _GenreChip({required this.label, required this.onTap});
 
   final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: jellyfinAccent.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: jellyfinAccent.withValues(alpha: 0.35)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: jellyfinAccent,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: jellyfinAccent.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: jellyfinAccent.withValues(alpha: 0.35)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: jellyfinAccent,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

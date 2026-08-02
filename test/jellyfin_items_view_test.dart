@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:m3u8downloader/src/jellyfin_client.dart';
-import 'package:m3u8downloader/src/jellyfin_library_view.dart';
+import 'package:m3u8downloader/src/jellyfin_items_view.dart';
 
 const _jsonHeaders = {'content-type': 'application/json'};
 
@@ -19,20 +19,21 @@ JellyfinClient _client(MockClient mock) => JellyfinClient(
   userId: 'u1',
 );
 
-JellyfinView _view() => JellyfinView(
-  id: 'v1',
-  name: '电影',
-  collectionType: 'movies',
-  primaryImageTag: 'vt1',
-);
-
 Future<void> _pumpLibrary(WidgetTester tester, JellyfinClient client) async {
   tester.view.physicalSize = const Size(800, 1600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MaterialApp(
-      home: JellyfinLibraryView(view: _view(), client: client),
+      home: JellyfinItemsView(
+        title: '电影',
+        client: client,
+        loadPage: (limit, startIndex) => client.fetchItems(
+          parentId: 'v1',
+          limit: limit,
+          startIndex: startIndex,
+        ),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -87,7 +88,7 @@ void main() {
     );
     await _pumpLibrary(tester, client);
 
-    expect(find.text('这个媒体库是空的'), findsOneWidget);
+    expect(find.text('这里暂时没有内容'), findsOneWidget);
   });
 
   testWidgets('load failure shows retry and retry succeeds', (tester) async {
@@ -132,8 +133,15 @@ void main() {
                   result = await Navigator.push<String>(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          JellyfinLibraryView(view: _view(), client: client),
+                      builder: (_) => JellyfinItemsView(
+                        title: '电影',
+                        client: client,
+                        loadPage: (limit, startIndex) => client.fetchItems(
+                          parentId: 'v1',
+                          limit: limit,
+                          startIndex: startIndex,
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -147,7 +155,7 @@ void main() {
     await tester.tap(find.text('打开'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(JellyfinLibraryView), findsNothing);
+    expect(find.byType(JellyfinItemsView), findsNothing);
     expect(result, 'expired');
   });
 }

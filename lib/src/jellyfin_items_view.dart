@@ -4,21 +4,23 @@ import 'jellyfin_client.dart';
 import 'jellyfin_detail_view.dart';
 import 'jellyfin_theme.dart';
 
-class JellyfinLibraryView extends StatefulWidget {
-  const JellyfinLibraryView({
+class JellyfinItemsView extends StatefulWidget {
+  const JellyfinItemsView({
     super.key,
-    required this.view,
+    required this.title,
     required this.client,
+    required this.loadPage,
   });
 
-  final JellyfinView view;
+  final String title;
   final JellyfinClient client;
+  final Future<List<JellyfinItem>> Function(int limit, int startIndex) loadPage;
 
   @override
-  State<JellyfinLibraryView> createState() => _JellyfinLibraryViewState();
+  State<JellyfinItemsView> createState() => _JellyfinItemsViewState();
 }
 
-class _JellyfinLibraryViewState extends State<JellyfinLibraryView> {
+class _JellyfinItemsViewState extends State<JellyfinItemsView> {
   static const _pageSize = 48;
 
   final _scrollController = ScrollController();
@@ -55,11 +57,7 @@ class _JellyfinLibraryViewState extends State<JellyfinLibraryView> {
       _error = null;
     });
     try {
-      final items = await _client.fetchItems(
-        parentId: widget.view.id,
-        limit: _pageSize,
-        startIndex: 0,
-      );
+      final items = await widget.loadPage(_pageSize, 0);
       if (!mounted) return;
       setState(() {
         _items = items;
@@ -84,11 +82,7 @@ class _JellyfinLibraryViewState extends State<JellyfinLibraryView> {
     setState(() => _loadingMore = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final items = await _client.fetchItems(
-        parentId: widget.view.id,
-        limit: _pageSize,
-        startIndex: _items.length,
-      );
+      final items = await widget.loadPage(_pageSize, _items.length);
       if (!mounted) return;
       setState(() {
         _items = [..._items, ...items];
@@ -135,7 +129,7 @@ class _JellyfinLibraryViewState extends State<JellyfinLibraryView> {
           backgroundColor: jellyfinBackground,
           foregroundColor: Colors.white,
           title: Text(
-            widget.view.name,
+            widget.title,
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
@@ -267,7 +261,7 @@ class _LibraryEmptyView extends StatelessWidget {
           Icon(Icons.video_library_outlined, color: Colors.white24, size: 44),
           SizedBox(height: 12),
           Text(
-            '这个媒体库是空的',
+            '这里暂时没有内容',
             style: TextStyle(color: Colors.white54, fontSize: 15),
           ),
         ],

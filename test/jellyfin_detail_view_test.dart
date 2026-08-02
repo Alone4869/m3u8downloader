@@ -31,6 +31,37 @@ class _FakeLauncher extends UrlLauncherPlatform {
   Future<bool> supportsMode(PreferredLaunchMode mode) async => true;
 }
 
+Map<String, dynamic> _detailJson() => {
+  'Id': 'd1',
+  'Type': 'Movie',
+  'Name': '星际穿越',
+  'ProductionYear': 2014,
+  'RunTimeTicks': 9000000000,
+  'CommunityRating': 8.6,
+  'Genres': ['科幻', '冒险'],
+  'Overview': '一段跨越时空的旅程。',
+  'ImageTags': {'Primary': 'p1'},
+  'BackdropImageTags': ['b1'],
+  'MediaSources': [
+    {
+      'MediaStreams': [
+        {
+          'Type': 'Video',
+          'Codec': 'h264',
+          'Width': 1920,
+          'Height': 1080,
+          'FrameRate': 23.976,
+        },
+        {'Type': 'Audio', 'Codec': 'aac'},
+      ],
+    },
+  ],
+  'People': [
+    {'Id': 'p1', 'Name': '克里斯托弗·诺兰', 'Role': '导演'},
+    {'Id': 'p2', 'Name': '马修·麦康纳', 'Role': '演员'},
+  ],
+};
+
 JellyfinClient _detailClient() => JellyfinClient(
   httpClient: MockClient((request) async {
     final path = request.url.path;
@@ -41,36 +72,7 @@ JellyfinClient _detailClient() => JellyfinClient(
         ],
       });
     }
-    return _ok({
-      'Id': 'd1',
-      'Type': 'Movie',
-      'Name': '星际穿越',
-      'ProductionYear': 2014,
-      'RunTimeTicks': 9000000000,
-      'CommunityRating': 8.6,
-      'Genres': ['科幻', '冒险'],
-      'Overview': '一段跨越时空的旅程。',
-      'ImageTags': {'Primary': 'p1'},
-      'BackdropImageTags': ['b1'],
-      'MediaSources': [
-        {
-          'MediaStreams': [
-            {
-              'Type': 'Video',
-              'Codec': 'h264',
-              'Width': 1920,
-              'Height': 1080,
-              'FrameRate': 23.976,
-            },
-            {'Type': 'Audio', 'Codec': 'aac'},
-          ],
-        },
-      ],
-      'People': [
-        {'Id': 'p1', 'Name': '克里斯托弗·诺兰', 'Role': '导演'},
-        {'Id': 'p2', 'Name': '马修·麦康纳', 'Role': '演员'},
-      ],
-    });
+    return _ok(_detailJson());
   }),
   baseUrl: 'http://192.168.1.10:8096',
   accessToken: 'tok',
@@ -115,6 +117,81 @@ void main() {
     expect(launcher.launchedUrl, isNotNull);
     expect(launcher.launchedUrl, contains('stream.mp4'));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('tapping a person opens their works list', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    Uri? worksUri;
+    final client = JellyfinClient(
+      httpClient: MockClient((request) async {
+        final path = request.url.path;
+        if (path.endsWith('/Items/d1')) return _ok(_detailJson());
+        worksUri = request.url;
+        return _ok({
+          'Items': [
+            {'Id': 'w1', 'Type': 'Movie', 'Name': '诺兰作品一'},
+          ],
+        });
+      }),
+      baseUrl: 'http://192.168.1.10:8096',
+      accessToken: 'tok',
+      userId: 'u1',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: JellyfinDetailView(itemId: 'd1', client: client),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('克里斯托弗·诺兰'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('克里斯托弗·诺兰'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('诺兰作品一'), findsOneWidget);
+    expect(worksUri!.queryParameters['PersonIds'], 'p1');
+    expect(
+      worksUri!.queryParameters['IncludeItemTypes'],
+      'Movie,Series,BoxSet',
+    );
+  });
+
+  testWidgets('tapping a genre chip opens genre works list', (tester) async {
+    Uri? worksUri;
+    final client = JellyfinClient(
+      httpClient: MockClient((request) async {
+        final path = request.url.path;
+        if (path.endsWith('/Items/d1')) return _ok(_detailJson());
+        worksUri = request.url;
+        return _ok({
+          'Items': [
+            {'Id': 'w1', 'Type': 'Movie', 'Name': '科幻合集'},
+          ],
+        });
+      }),
+      baseUrl: 'http://192.168.1.10:8096',
+      accessToken: 'tok',
+      userId: 'u1',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: JellyfinDetailView(itemId: 'd1', client: client),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('科幻'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('科幻合集'), findsOneWidget);
+    expect(worksUri!.queryParameters['Genres'], '科幻');
+    expect(
+      worksUri!.queryParameters['IncludeItemTypes'],
+      'Movie,Series,BoxSet',
+    );
   });
 
   testWidgets('401 pops with token expired result', (tester) async {

@@ -12,6 +12,7 @@ import 'glass_surface.dart';
 import 'server_home_view.dart';
 import 'settings_view.dart';
 import 'smb_upload.dart';
+import 'theme_settings.dart';
 import 'twitter_home_view.dart';
 
 const double _bottomNavigationHeight = 68;
@@ -28,18 +29,32 @@ double _bottomNavigationClearance(BuildContext context) {
   return bottomInset + bottomMargin + _bottomNavigationHeight;
 }
 
-class M3u8DownloaderApp extends StatelessWidget {
+class M3u8DownloaderApp extends StatefulWidget {
   const M3u8DownloaderApp({super.key});
 
   @override
+  State<M3u8DownloaderApp> createState() => _M3u8DownloaderAppState();
+}
+
+class _M3u8DownloaderAppState extends State<M3u8DownloaderApp> {
+  @override
+  void initState() {
+    super.initState();
+    ThemeModeStore.instance.load();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'M3U8 视频下载器',
-      theme: _buildAppTheme(Brightness.light),
-      darkTheme: _buildAppTheme(Brightness.dark),
-      themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+    return ValueListenableBuilder<AppThemeMode>(
+      valueListenable: ThemeModeStore.instance.mode,
+      builder: (context, mode, _) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'M3U8 视频下载器',
+        theme: _buildAppTheme(Brightness.light),
+        darkTheme: _buildAppTheme(Brightness.dark),
+        themeMode: mode.themeMode,
+        home: const HomeScreen(),
+      ),
     );
   }
 }

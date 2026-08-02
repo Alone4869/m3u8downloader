@@ -4,6 +4,7 @@ import 'app_update.dart';
 import 'download_bridge.dart';
 import 'glass_surface.dart';
 import 'smb_settings.dart';
+import 'theme_settings.dart';
 import 'twitter_download_settings.dart';
 
 class SettingsView extends StatefulWidget {
@@ -74,6 +75,19 @@ class _SettingsViewState extends State<SettingsView> {
                     _reload();
                   },
                 ),
+              ],
+            ),
+            const _SettingsHeader('外观'),
+            _SettingsCard(
+              children: [
+                for (
+                  var index = 0;
+                  index < AppThemeMode.values.length;
+                  index++
+                ) ...[
+                  if (index > 0) const Divider(indent: 64),
+                  _ThemeModeTile(mode: AppThemeMode.values[index]),
+                ],
               ],
             ),
             const _SettingsHeader('应用'),
@@ -221,6 +235,31 @@ class _DownloadRouteTile extends StatelessWidget {
       ),
       selected: selected,
       onTap: onTap,
+    );
+  }
+}
+
+class _ThemeModeTile extends StatelessWidget {
+  const _ThemeModeTile({required this.mode});
+
+  final AppThemeMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ValueListenableBuilder<AppThemeMode>(
+      valueListenable: ThemeModeStore.instance.mode,
+      builder: (context, current, _) => ListTile(
+        leading: _SettingsIcon(mode.icon),
+        title: Text(mode.title),
+        subtitle: Text(mode.description),
+        trailing: Icon(
+          current == mode ? Icons.check_circle_rounded : Icons.circle_outlined,
+          color: current == mode ? colors.primary : colors.outline,
+        ),
+        selected: current == mode,
+        onTap: () => ThemeModeStore.instance.save(mode),
+      ),
     );
   }
 }

@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'jellyfin_client.dart';
 import 'jellyfin_detail_view.dart';
-import 'jellyfin_library_view.dart';
+import 'jellyfin_items_view.dart';
 import 'jellyfin_theme.dart';
 import 'server_settings.dart';
 import 'video_player_launcher.dart';
@@ -181,7 +181,15 @@ class _JellyfinHomeViewState extends State<JellyfinHomeView> {
     Navigator.push(
       context,
       jellyfinRoute(
-        builder: (_) => JellyfinLibraryView(view: view, client: _client),
+        builder: (_) => JellyfinItemsView(
+          title: view.name,
+          client: _client,
+          loadPage: (limit, startIndex) => _client.fetchItems(
+            parentId: view.id,
+            limit: limit,
+            startIndex: startIndex,
+          ),
+        ),
       ),
     ).then((result) {
       if (result == 'expired' && mounted) {

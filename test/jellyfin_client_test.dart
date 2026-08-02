@@ -207,6 +207,46 @@ void main() {
     expect(await client.fetchViewCount('v1', itemType: 'Movie'), 128);
   });
 
+  test('fetchPersonWorks filters by person and pages', () async {
+    Uri? seen;
+    final client = _client((request) async {
+      seen = request.url;
+      return _ok({
+        'Items': [
+          {'Id': 'w1', 'Type': 'Movie', 'Name': '作品一'},
+        ],
+      });
+    });
+    final items = await client.fetchPersonWorks(
+      'p1',
+      limit: 48,
+      startIndex: 48,
+    );
+    expect(items.single.name, '作品一');
+    expect(seen!.path, '/Users/u1/Items');
+    expect(seen!.queryParameters['PersonIds'], 'p1');
+    expect(seen!.queryParameters['IncludeItemTypes'], 'Movie,Series,BoxSet');
+    expect(seen!.queryParameters['Recursive'], 'true');
+    expect(seen!.queryParameters['Limit'], '48');
+    expect(seen!.queryParameters['StartIndex'], '48');
+  });
+
+  test('fetchGenreWorks filters by genre name', () async {
+    Uri? seen;
+    final client = _client((request) async {
+      seen = request.url;
+      return _ok({
+        'Items': [
+          {'Id': 'w1', 'Type': 'Movie', 'Name': '科幻片'},
+        ],
+      });
+    });
+    final items = await client.fetchGenreWorks('科幻', limit: 48);
+    expect(items.single.name, '科幻片');
+    expect(seen!.queryParameters['Genres'], '科幻');
+    expect(seen!.queryParameters['IncludeItemTypes'], 'Movie,Series,BoxSet');
+  });
+
   test('fetchItem requests fields and parses detail with people', () async {
     Uri? seen;
     final client = _client((request) async {

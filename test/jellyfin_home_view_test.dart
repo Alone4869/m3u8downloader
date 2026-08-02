@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:m3u8downloader/src/jellyfin_client.dart';
 import 'package:m3u8downloader/src/jellyfin_home_view.dart';
-import 'package:m3u8downloader/src/jellyfin_library_view.dart';
+import 'package:m3u8downloader/src/jellyfin_items_view.dart';
 import 'package:m3u8downloader/src/server_settings.dart';
 
 const _jsonHeaders = {'content-type': 'application/json'};
@@ -205,7 +205,7 @@ void main() {
     await tester.tap(find.text('电影'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(JellyfinLibraryView), findsOneWidget);
+    expect(find.byType(JellyfinItemsView), findsOneWidget);
     expect(find.text('库内电影1'), findsOneWidget);
     expect(find.text('库内电影2'), findsOneWidget);
   });

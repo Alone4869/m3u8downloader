@@ -259,6 +259,42 @@ class JellyfinClient {
     return _parseItems(data['Items']);
   }
 
+  Future<List<JellyfinItem>> fetchPersonWorks(
+    String personId, {
+    int limit = 48,
+    int startIndex = 0,
+  }) async {
+    final data =
+        await _getJson('/Users/$userId/Items', {
+              'Recursive': 'true',
+              'PersonIds': personId,
+              'IncludeItemTypes': 'Movie,Series,BoxSet',
+              'Limit': '$limit',
+              'StartIndex': '$startIndex',
+              'Fields': 'BackdropImageTags,Genres',
+            })
+            as Map<String, dynamic>;
+    return _parseItems(data['Items']);
+  }
+
+  Future<List<JellyfinItem>> fetchGenreWorks(
+    String genreName, {
+    int limit = 48,
+    int startIndex = 0,
+  }) async {
+    final data =
+        await _getJson('/Users/$userId/Items', {
+              'Recursive': 'true',
+              'Genres': genreName,
+              'IncludeItemTypes': 'Movie,Series,BoxSet',
+              'Limit': '$limit',
+              'StartIndex': '$startIndex',
+              'Fields': 'BackdropImageTags,Genres',
+            })
+            as Map<String, dynamic>;
+    return _parseItems(data['Items']);
+  }
+
   Future<JellyfinItem> fetchItem(String id) async {
     final data =
         await _getJson('/Users/$userId/Items/$id', {
